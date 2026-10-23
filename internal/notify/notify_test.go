@@ -107,4 +107,31 @@ func TestWeeklyDigestCombinesMentionsAndSearch(t *testing.T) {
 			t.Errorf("weekly digest missing %q: %s", want, event.Text)
 		}
 	}
+	box, err := secret.New(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := config.Manager{Store: db, Box: box}
+	if err := manager.Save(ctx, config.Settings{AIProvider: "none", SlackWebhook: "https://example.test/hook", NotifyWeekly: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	client := &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+		calls++
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(string(body), "42 clicks") {
+			t.Errorf("weekly webhook missing report: %s", body)
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader("ok")), Header: http.Header{}}, nil
+	})}
+	service := Service{Store: db, Config: manager, Client: client, Now: func() time.Time { return now }}
+	if err := service.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("weekly report sent %d times, want once", calls)
+	}
 }

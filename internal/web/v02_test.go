@@ -67,7 +67,7 @@ func TestFirstRunSetupProgressesThroughOptionalSteps(t *testing.T) {
 func TestPortableExportOmitsSecretsAndImportsProjects(t *testing.T) {
 	s, db := v02Server(t)
 	ctx := context.Background()
-	if err := s.Config.Save(ctx, config.Settings{AIProvider: "anthropic", AIKey: "secret-ai-key", AIBaseURL: "https://secret.example/token", SMTPPassword: "secret-smtp-pass", SlackWebhook: "https://secret.example/hook", GenericWebhook: "https://secret.example/events"}); err != nil {
+	if err := s.Config.Save(ctx, config.Settings{AIProvider: "anthropic", AIKey: "secret-ai-key", AIBaseURL: "https://secret.example/token", SlackWebhook: "https://secret.example/hook", GenericWebhook: "https://secret.example/events"}); err != nil {
 		t.Fatal(err)
 	}
 	_, err := db.SaveProject(ctx, store.Project{Name: "Acme", DraftSettings: store.DraftSettings{Description: "Useful product facts"}})
@@ -79,10 +79,13 @@ func TestPortableExportOmitsSecretsAndImportsProjects(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("export: %d", rec.Code)
 	}
-	for _, secret := range []string{"secret-ai-key", "secret-smtp-pass", "secret.example"} {
+	for _, secret := range []string{"secret-ai-key", "secret.example"} {
 		if strings.Contains(rec.Body.String(), secret) {
 			t.Fatalf("export leaked %q", secret)
 		}
+	}
+	if strings.Contains(rec.Body.String(), "smtp_") {
+		t.Fatal("export still contains removed SMTP settings")
 	}
 	var exported portableSettings
 	if err := json.Unmarshal(rec.Body.Bytes(), &exported); err != nil || len(exported.Projects) != 1 || exported.Projects[0].Description != "Useful product facts" {
@@ -110,14 +113,14 @@ func TestPortableExportOmitsSecretsAndImportsProjects(t *testing.T) {
 		t.Fatalf("imported projects: %d, %v", len(projects), err)
 	}
 	cfg, err := s.Config.Load(ctx)
-	if err != nil || cfg.AIKey != "secret-ai-key" || cfg.SMTPPassword != "secret-smtp-pass" || cfg.SlackWebhook != "https://secret.example/hook" {
+	if err != nil || cfg.AIKey != "secret-ai-key" || cfg.SlackWebhook != "https://secret.example/hook" {
 		t.Fatalf("import changed current secrets: %v", err)
 	}
 }
 
-func TestNotificationSettingsUsesDefaultPort(t *testing.T) {
+func TestNotificationSettingsSavesWebhookAndDigest(t *testing.T) {
 	s, _ := v02Server(t)
-	values := url.Values{"smtp_host": {"mail.example.com"}, "smtp_from": {"alerts@example.com"}, "smtp_to": {"me@example.com"}, "notify_weekly": {"1"}}
+	values := url.Values{"slack_webhook": {"https://hooks.slack.com/services/example"}, "notify_weekly": {"1"}, "smtp_host": {"mail.example.com"}}
 	req := httptest.NewRequest(http.MethodPost, "/settings/notifications", strings.NewReader(values.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -126,7 +129,16 @@ func TestNotificationSettingsUsesDefaultPort(t *testing.T) {
 		t.Fatalf("save notification settings: %d %s", rec.Code, rec.Body.String())
 	}
 	cfg, err := s.Config.Load(context.Background())
-	if err != nil || cfg.SMTPPort != "587" || cfg.NotifyWeekly != "1" {
+	if err != nil || cfg.SlackWebhook != "https://hooks.slack.com/services/example" || cfg.NotifyWeekly != "1" {
 		t.Fatalf("saved notification settings were incomplete: %v", err)
+	}
+	stored, err := s.Config.Store.Settings(context.Background())
+	if err != nil || stored["smtp_host"] != "" {
+		t.Fatalf("obsolete SMTP field was stored: %v", err)
+	}
+	rec = httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/settings", nil))
+	if strings.Contains(rec.Body.String(), "Email (SMTP)") || strings.Contains(rec.Body.String(), "smtp_host") {
+		t.Fatal("SMTP setup is still shown in settings")
 	}
 }

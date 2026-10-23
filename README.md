@@ -17,7 +17,7 @@ It runs on your own server. Your tokens, your data and your AI prompts stay ther
 - **Traffic:** with a read-only Google Analytics 4 key, each project gets a Traffic tab: visitors, visits and page views against the 28 days before, visitors per day, where visitors came from, landing pages and the most read pages. "From the places Eavesong listens" puts the visits from Hacker News, Reddit, Bluesky and the other sources next to the mentions Eavesong found there, which shows where people talk about you without linking. The same service-account key as Search Console works; it needs the Google Analytics Admin and Data APIs enabled and Viewer access to the property. Each project is matched to the property whose web data stream measures its domain.
 - **Report:** mentions by source, share of voice between your product and competitors, and the items that needed a reply, over 7, 30 or 90 days.
 - **Your own accounts:** posts by your own usernames are recognised and kept out of the inbox.
-- **Notifications:** opt in to alerts for mentions needing attention, competitor mentions and sitemap errors through SMTP, Slack, Discord or a generic webhook. Daily and weekly summaries are sent by email.
+- **Notifications:** opt in to alerts for mentions needing attention, competitor mentions and sitemap errors through Slack, Discord or a generic webhook. Daily and weekly summaries can use the same destinations.
 
 ## Run it
 
@@ -44,7 +44,7 @@ EAVESONG_PASSWORD=change-me ./eavesong serve
 
 Choose the AI provider for reply drafts (Anthropic, DeepSeek, Gemini, or any OpenAI-compatible API including a local model) and connect accounts on the **Settings** page (top right). You can connect several accounts per platform. API keys and tokens are encrypted before they are stored and are never shown again; leave a field empty to keep the saved value. Changes apply from the next check, with no restart. **Send a test draft** checks the key and model.
 
-The **Notifications** section lets you set an SMTP server or webhook destinations, then choose which events should alert you. SMTP requires TLS or STARTTLS. Daily digests run after 08:00 UTC; weekly reports run on Mondays after 08:00 UTC during the next scheduled check. The weekly email includes mention counts, share of voice and available Search Console totals. Eavesong records successful deliveries so each event is sent once per destination.
+The **Notifications** section lets you connect Slack, Discord or a generic webhook, then choose which events should alert you. Daily digests run after 08:00 UTC; weekly reports run on Mondays after 08:00 UTC during the next scheduled check. The weekly report includes mention counts, share of voice and available Search Console totals. Eavesong records successful deliveries so each event is sent once per destination.
 
 The encryption key lives in a file next to the database (`eavesong.db.key`, created on first run, readable only by its owner). Back it up with the database: without it, saved keys cannot be read and have to be entered again. To manage the key yourself, set `EAVESONG_SECRET_KEY` to 32 random bytes, base64-encoded (`openssl rand -base64 32`).
 

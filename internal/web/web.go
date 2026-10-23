@@ -529,7 +529,7 @@ func (s *Server) globalSettings(w http.ResponseWriter, r *http.Request) {
 	data["Imported"] = q.Has("imported")
 	data["Notifications"] = cfg
 	data["NotificationSaved"] = q.Has("notifications_saved")
-	data["SMTPHint"], data["SlackHint"], data["DiscordHint"], data["WebhookHint"] = config.Hint(cfg.SMTPPassword), config.Hint(cfg.SlackWebhook), config.Hint(cfg.DiscordWebhook), config.Hint(cfg.GenericWebhook)
+	data["SlackHint"], data["DiscordHint"], data["WebhookHint"] = config.Hint(cfg.SlackWebhook), config.Hint(cfg.DiscordWebhook), config.Hint(cfg.GenericWebhook)
 	if savedSettings, err := s.Store.Settings(ctx); err == nil {
 		data["SetupStage"] = savedSettings["setup_stage"]
 	}

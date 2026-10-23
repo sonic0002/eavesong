@@ -68,24 +68,16 @@
 
 <section class="accounts-section" id="notifications">
   <h2>Notifications</h2>
-  <p class="hint">Choose what should alert you. Eavesong sends notifications only to the destinations you connect. Weekly reports and daily digests go by email.</p>
+  <p class="hint">Choose what should alert you. Eavesong sends notifications and summaries only to the webhooks you connect.</p>
   {{if .NotificationSaved}}<p class="flash flash-ok" role="status">Notification settings saved.</p>{{end}}
   <form class="settings" method="post" action="/settings/notifications">
     <fieldset class="field"><legend>Notify me about</legend>
       <label class="check-label"><input type="checkbox" name="notify_attention" value="1"{{if .Notifications.NotifyAttention}} checked{{end}}> Replies needing personal attention</label>
       <label class="check-label"><input type="checkbox" name="notify_competitor" value="1"{{if .Notifications.NotifyCompetitor}} checked{{end}}> New competitor mentions</label>
       <label class="check-label"><input type="checkbox" name="notify_sitemap" value="1"{{if .Notifications.NotifySitemap}} checked{{end}}> Search Console sitemap errors</label>
-      <label class="check-label"><input type="checkbox" name="notify_daily" value="1"{{if .Notifications.NotifyDaily}} checked{{end}}> Daily digest (email)</label>
-      <label class="check-label"><input type="checkbox" name="notify_weekly" value="1"{{if .Notifications.NotifyWeekly}} checked{{end}}> Weekly report (email)</label>
+      <label class="check-label"><input type="checkbox" name="notify_daily" value="1"{{if .Notifications.NotifyDaily}} checked{{end}}> Daily digest</label>
+      <label class="check-label"><input type="checkbox" name="notify_weekly" value="1"{{if .Notifications.NotifyWeekly}} checked{{end}}> Weekly report</label>
     </fieldset>
-    <h3>Email (SMTP)</h3>
-    <p class="hint">Use your mail provider's SMTP server. Eavesong requires TLS before sending a password.</p>
-    <div class="field"><label for="smtp_host">Server</label><input id="smtp_host" name="smtp_host" value="{{.Notifications.SMTPHost}}" placeholder="smtp.example.com"></div>
-    <div class="field"><label for="smtp_port">Port</label><input id="smtp_port" name="smtp_port" value="{{.Notifications.SMTPPort}}" placeholder="587" inputmode="numeric"></div>
-    <div class="field"><label for="smtp_user">Username</label><input id="smtp_user" name="smtp_user" value="{{.Notifications.SMTPUser}}" autocomplete="username"></div>
-    <div class="field"><label for="smtp_password">Password</label><p class="hint">{{if .SMTPHint}}{{.SMTPHint}}. Leave empty to keep it.{{else}}Leave empty if your server needs no password.{{end}}</p><input id="smtp_password" name="smtp_password" type="password" autocomplete="new-password">{{if .SMTPHint}}<label class="remove"><input type="checkbox" name="remove_smtp_password" value="1"> Remove saved password</label>{{end}}</div>
-    <div class="field"><label for="smtp_from">From address</label><input id="smtp_from" name="smtp_from" value="{{.Notifications.SMTPFrom}}" type="email" placeholder="alerts@example.com"></div>
-    <div class="field"><label for="smtp_to">Send to</label><input id="smtp_to" name="smtp_to" value="{{.Notifications.SMTPTo}}" type="email" placeholder="you@example.com"></div>
     <h3>Webhooks</h3>
     <p class="hint">Create an incoming webhook in Slack or Discord and paste its URL. A generic webhook receives JSON with event, project, text and URL fields.</p>
     <div class="field"><label for="slack_webhook">Slack incoming webhook</label><p class="hint">{{if .SlackHint}}{{.SlackHint}}. Leave empty to keep it.{{end}}</p><input id="slack_webhook" name="slack_webhook" type="password" placeholder="https://hooks.slack.com/services/…">{{if .SlackHint}}<label class="remove"><input type="checkbox" name="remove_slack_webhook" value="1"> Remove saved URL</label>{{end}}</div>

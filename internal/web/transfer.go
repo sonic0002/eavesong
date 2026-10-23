@@ -26,15 +26,16 @@ type portableProject struct {
 	ReadLinks   bool     `json:"read_links,omitempty"`
 }
 type portableSettings struct {
-	Version          int               `json:"version"`
-	AIProvider       string            `json:"ai_provider"`
-	AIModel          string            `json:"ai_model,omitempty"`
-	XDailyCap        string            `json:"x_daily_cap,omitempty"`
-	SMTPHost         string            `json:"smtp_host,omitempty"`
-	SMTPPort         string            `json:"smtp_port,omitempty"`
-	SMTPUser         string            `json:"smtp_user,omitempty"`
-	SMTPFrom         string            `json:"smtp_from,omitempty"`
-	SMTPTo           string            `json:"smtp_to,omitempty"`
+	Version    int    `json:"version"`
+	AIProvider string `json:"ai_provider"`
+	AIModel    string `json:"ai_model,omitempty"`
+	XDailyCap  string `json:"x_daily_cap,omitempty"`
+	// Accept older exports with SMTP fields, but never export or restore them.
+	LegacySMTPHost   string            `json:"smtp_host,omitempty"`
+	LegacySMTPPort   string            `json:"smtp_port,omitempty"`
+	LegacySMTPUser   string            `json:"smtp_user,omitempty"`
+	LegacySMTPFrom   string            `json:"smtp_from,omitempty"`
+	LegacySMTPTo     string            `json:"smtp_to,omitempty"`
 	NotifyAttention  string            `json:"notify_attention,omitempty"`
 	NotifyCompetitor string            `json:"notify_competitor,omitempty"`
 	NotifySitemap    string            `json:"notify_sitemap,omitempty"`
@@ -57,7 +58,7 @@ func (s *Server) exportSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	// A custom AI address can contain credentials in its path or query. It is
 	// intentionally excluded with keys and webhook URLs.
-	out := portableSettings{Version: 1, AIProvider: cfg.AIProvider, AIModel: cfg.AIModel, XDailyCap: cfg.XDailyCap, SMTPHost: cfg.SMTPHost, SMTPPort: cfg.SMTPPort, SMTPUser: cfg.SMTPUser, SMTPFrom: cfg.SMTPFrom, SMTPTo: cfg.SMTPTo, NotifyAttention: cfg.NotifyAttention, NotifyCompetitor: cfg.NotifyCompetitor, NotifySitemap: cfg.NotifySitemap, NotifyDaily: cfg.NotifyDaily, NotifyWeekly: cfg.NotifyWeekly}
+	out := portableSettings{Version: 1, AIProvider: cfg.AIProvider, AIModel: cfg.AIModel, XDailyCap: cfg.XDailyCap, NotifyAttention: cfg.NotifyAttention, NotifyCompetitor: cfg.NotifyCompetitor, NotifySitemap: cfg.NotifySitemap, NotifyDaily: cfg.NotifyDaily, NotifyWeekly: cfg.NotifyWeekly}
 	for _, p := range projects {
 		out.Projects = append(out.Projects, portableProject{Name: p.Name, Domains: p.Domains, Keywords: p.Keywords, Competitors: p.Competitors, OwnAccounts: p.OwnAccounts, Description: p.Description, Tone: p.Tone, ReplyLength: p.ReplyLength, AvoidWords: p.AvoidWords, Examples: p.Examples, ReadLinks: p.ReadLinks})
 	}
@@ -128,11 +129,7 @@ func (s *Server) importSettings(w http.ResponseWriter, r *http.Request) {
 	if next.AIProvider != current.AIProvider {
 		next.AIBaseURL = ""
 	}
-	next.SMTPHost, next.SMTPPort, next.SMTPUser, next.SMTPFrom, next.SMTPTo = data.SMTPHost, data.SMTPPort, data.SMTPUser, data.SMTPFrom, data.SMTPTo
 	next.NotifyAttention, next.NotifyCompetitor, next.NotifySitemap, next.NotifyDaily, next.NotifyWeekly = data.NotifyAttention, data.NotifyCompetitor, data.NotifySitemap, data.NotifyDaily, data.NotifyWeekly
-	if next.SMTPHost != current.SMTPHost || next.SMTPUser != current.SMTPUser {
-		next.SMTPPassword = ""
-	}
 	// Imported files contain no credentials. Retain the current key only when
 	// the provider has not changed; otherwise let the owner reconnect it.
 	if next.AIProvider == current.AIProvider {

@@ -2,10 +2,7 @@ package web
 
 import (
 	"net/http"
-	"net/mail"
 	"net/url"
-	"strconv"
-	"strings"
 )
 
 func validWebhook(raw string) bool {
@@ -21,36 +18,12 @@ func (s *Server) saveNotificationSettings(w http.ResponseWriter, r *http.Request
 		s.fail(w, err)
 		return
 	}
-	cfg.SMTPHost = strings.TrimSpace(r.FormValue("smtp_host"))
-	cfg.SMTPPort = strings.TrimSpace(r.FormValue("smtp_port"))
-	if cfg.SMTPHost != "" && cfg.SMTPPort == "" {
-		cfg.SMTPPort = "587"
-	}
-	cfg.SMTPUser = strings.TrimSpace(r.FormValue("smtp_user"))
-	cfg.SMTPFrom = strings.TrimSpace(r.FormValue("smtp_from"))
-	cfg.SMTPTo = strings.TrimSpace(r.FormValue("smtp_to"))
-	cfg.SMTPPassword = keep(r, "smtp_password", cfg.SMTPPassword)
 	cfg.SlackWebhook = keep(r, "slack_webhook", cfg.SlackWebhook)
 	cfg.DiscordWebhook = keep(r, "discord_webhook", cfg.DiscordWebhook)
 	cfg.GenericWebhook = keep(r, "generic_webhook", cfg.GenericWebhook)
 	for _, p := range []string{cfg.SlackWebhook, cfg.DiscordWebhook, cfg.GenericWebhook} {
 		if !validWebhook(p) {
 			http.Error(w, "Webhook URLs must use HTTPS (or localhost HTTP).", 400)
-			return
-		}
-	}
-	if cfg.SMTPHost != "" {
-		port, err := strconv.Atoi(cfg.SMTPPort)
-		if err != nil || port < 1 || port > 65535 {
-			http.Error(w, "Enter an SMTP port from 1 to 65535.", 400)
-			return
-		}
-		if address, err := mail.ParseAddress(cfg.SMTPFrom); err != nil || address.Address != cfg.SMTPFrom {
-			http.Error(w, "Enter a valid From email address.", 400)
-			return
-		}
-		if address, err := mail.ParseAddress(cfg.SMTPTo); err != nil || address.Address != cfg.SMTPTo {
-			http.Error(w, "Enter a valid To email address.", 400)
 			return
 		}
 	}

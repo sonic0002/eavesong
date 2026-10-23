@@ -24,7 +24,6 @@ type Settings struct {
 	AIKey      string // secret
 
 	XDailyCap                                                                   string // most paid X posts read per UTC day
-	SMTPHost, SMTPPort, SMTPUser, SMTPPassword, SMTPFrom, SMTPTo                string
 	SlackWebhook, DiscordWebhook, GenericWebhook                                string
 	NotifyAttention, NotifyCompetitor, NotifySitemap, NotifyDaily, NotifyWeekly string
 }
@@ -41,12 +40,6 @@ var fields = []struct {
 	{"ai_base_url", "EAVESONG_AI_BASE_URL", false, func(s *Settings) *string { return &s.AIBaseURL }},
 	{"ai_key", "", true, func(s *Settings) *string { return &s.AIKey }},
 	{"x_daily_cap", "EAVESONG_X_DAILY_CAP", false, func(s *Settings) *string { return &s.XDailyCap }},
-	{"smtp_host", "", false, func(s *Settings) *string { return &s.SMTPHost }},
-	{"smtp_port", "", false, func(s *Settings) *string { return &s.SMTPPort }},
-	{"smtp_user", "", false, func(s *Settings) *string { return &s.SMTPUser }},
-	{"smtp_password", "", true, func(s *Settings) *string { return &s.SMTPPassword }},
-	{"smtp_from", "", false, func(s *Settings) *string { return &s.SMTPFrom }},
-	{"smtp_to", "", false, func(s *Settings) *string { return &s.SMTPTo }},
 	{"slack_webhook", "", true, func(s *Settings) *string { return &s.SlackWebhook }},
 	{"discord_webhook", "", true, func(s *Settings) *string { return &s.DiscordWebhook }},
 	{"generic_webhook", "", true, func(s *Settings) *string { return &s.GenericWebhook }},

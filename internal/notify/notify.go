@@ -4,14 +4,11 @@ package notify
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/smtp"
 	"strings"
 	"time"
 
@@ -39,7 +36,7 @@ func (s *Service) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if cfg.SMTPHost == "" && cfg.SlackWebhook == "" && cfg.DiscordWebhook == "" && cfg.GenericWebhook == "" {
+	if cfg.SlackWebhook == "" && cfg.DiscordWebhook == "" && cfg.GenericWebhook == "" {
 		return nil
 	}
 	projects, err := s.Store.Projects(ctx)
@@ -75,7 +72,7 @@ func (s *Service) Run(ctx context.Context) error {
 					continue
 				}
 				e := Event{Key: fmt.Sprintf("mention:%d", m.ID), Kind: kind, Project: p.Name, Subject: "Eavesong: " + p.Name + " mention", Text: fmt.Sprintf("%s mention on %s by %s\n%s\n%s", kind, m.Source, m.Author, m.Title, m.URL), URL: m.URL}
-				if err := s.deliver(ctx, cfg, e, false); err != nil {
+				if err := s.deliver(ctx, cfg, e); err != nil {
 					return err
 				}
 			}
@@ -95,7 +92,7 @@ func (s *Service) Run(ctx context.Context) error {
 						continue
 					}
 					e := Event{Key: fmt.Sprintf("sitemap:%d:%s:%s", p.ID, report.End, sm.Path), Kind: "sitemap", Project: p.Name, Subject: "Eavesong: sitemap errors for " + p.Name, Text: fmt.Sprintf("%s has %d sitemap errors in Search Console (%s).", sm.Path, sm.Errors, report.End), URL: sm.Path}
-					if err := s.deliver(ctx, cfg, e, false); err != nil {
+					if err := s.deliver(ctx, cfg, e); err != nil {
 						return err
 					}
 				}
@@ -108,7 +105,7 @@ func (s *Service) Run(ctx context.Context) error {
 			}
 			e.Key = fmt.Sprintf("daily:%d:%s", p.ID, now.Format("2006-01-02"))
 			e.Kind = "daily"
-			if err := s.deliver(ctx, cfg, e, true); err != nil {
+			if err := s.deliver(ctx, cfg, e); err != nil {
 				return err
 			}
 		}
@@ -119,7 +116,7 @@ func (s *Service) Run(ctx context.Context) error {
 			}
 			e.Key = fmt.Sprintf("weekly:%d:%s", p.ID, now.Format("2006-01-02"))
 			e.Kind = "weekly"
-			if err := s.deliver(ctx, cfg, e, true); err != nil {
+			if err := s.deliver(ctx, cfg, e); err != nil {
 				return err
 			}
 		}
@@ -176,18 +173,12 @@ func (s *Service) digest(ctx context.Context, p store.Project, days int, now tim
 	}
 	return Event{Project: p.Name, Subject: "Eavesong: " + kind + " for " + p.Name, Text: b.String()}, nil
 }
-func (s *Service) deliver(ctx context.Context, cfg config.Settings, e Event, emailOnly bool) error {
+func (s *Service) deliver(ctx context.Context, cfg config.Settings, e Event) error {
 	type channel struct{ name, url string }
-	channels := []channel{}
-	if cfg.SMTPHost != "" && cfg.SMTPTo != "" {
-		channels = append(channels, channel{"email", ""})
-	}
-	if !emailOnly {
-		channels = append(channels, channel{"slack", cfg.SlackWebhook}, channel{"discord", cfg.DiscordWebhook}, channel{"webhook", cfg.GenericWebhook})
-	}
+	channels := []channel{{"slack", cfg.SlackWebhook}, {"discord", cfg.DiscordWebhook}, {"webhook", cfg.GenericWebhook}}
 	var failures []error
 	for _, ch := range channels {
-		if ch.name != "email" && ch.url == "" {
+		if ch.url == "" {
 			continue
 		}
 		sent, err := s.Store.NotificationDelivered(ctx, e.Key, ch.name)
@@ -197,11 +188,7 @@ func (s *Service) deliver(ctx context.Context, cfg config.Settings, e Event, ema
 		if sent {
 			continue
 		}
-		if ch.name == "email" {
-			err = sendEmail(ctx, cfg, e)
-		} else {
-			err = s.sendWebhook(ctx, ch.name, ch.url, e)
-		}
+		err = s.sendWebhook(ctx, ch.name, ch.url, e)
 		if err != nil {
 			failures = append(failures, fmt.Errorf("%s: %w", ch.name, err))
 			continue
@@ -240,62 +227,4 @@ func (s *Service) sendWebhook(ctx context.Context, kind, endpoint string, e Even
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	return nil
-}
-func sendEmail(ctx context.Context, cfg config.Settings, e Event) error {
-	port := cfg.SMTPPort
-	if port == "" {
-		port = "587"
-	}
-	address := net.JoinHostPort(cfg.SMTPHost, port)
-	dialer := net.Dialer{Timeout: 10 * time.Second}
-	conn, err := dialer.DialContext(ctx, "tcp", address)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	tlsConfig := &tls.Config{ServerName: cfg.SMTPHost, MinVersion: tls.VersionTLS12}
-	if port == "465" {
-		conn = tls.Client(conn, tlsConfig)
-		if err := conn.(*tls.Conn).HandshakeContext(ctx); err != nil {
-			return err
-		}
-	}
-	client, err := smtp.NewClient(conn, cfg.SMTPHost)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-	if port != "465" {
-		ok, _ := client.Extension("STARTTLS")
-		if !ok {
-			return errors.New("SMTP server does not offer STARTTLS")
-		}
-		if err := client.StartTLS(tlsConfig); err != nil {
-			return err
-		}
-	}
-	if cfg.SMTPUser != "" {
-		if err := client.Auth(smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPHost)); err != nil {
-			return err
-		}
-	}
-	if err := client.Mail(cfg.SMTPFrom); err != nil {
-		return err
-	}
-	if err := client.Rcpt(cfg.SMTPTo); err != nil {
-		return err
-	}
-	writer, err := client.Data()
-	if err != nil {
-		return err
-	}
-	subject := strings.NewReplacer("\r", " ", "\n", " ").Replace(e.Subject)
-	body := "From: " + cfg.SMTPFrom + "\r\nTo: " + cfg.SMTPTo + "\r\nSubject: " + subject + "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n" + strings.ReplaceAll(e.Text, "\n", "\r\n") + "\r\n"
-	if _, err := io.WriteString(writer, body); err != nil {
-		return err
-	}
-	if err := writer.Close(); err != nil {
-		return err
-	}
-	return client.Quit()
 }
