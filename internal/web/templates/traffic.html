@@ -1,0 +1,99 @@
+{{template "top" .}}
+{{template "phead" .}}
+
+{{if .Refreshed}}<p class="flash flash-ok" role="status">Traffic data refreshed from Google Analytics.</p>{{end}}
+{{if .HasReport}}{{with .RefreshError}}<div class="flash flash-err" role="alert">{{failure .}}</div>{{end}}{{end}}
+{{if .Fetching}}<p class="flash" role="status" data-fetch-status="/p/{{.Project.ID}}/traffic/status">Getting the latest numbers from Google Analytics. This page updates by itself in a few seconds.</p>{{end}}
+
+{{if not .Connected}}
+<div class="empty">
+  <p><strong>Google Analytics is not connected.</strong></p>
+  <p>Connect a read-only service-account key in <a href="/settings?open=googleanalytics#accounts-googleanalytics">Settings</a> to see how many people visit {{.Project.Name}}, where they come from, and how many arrive from the places Eavesong listens.</p>
+</div>
+{{else if not .HasReport}}
+<div class="empty">
+  <p><strong>No traffic data yet.</strong></p>
+  {{with or .RefreshError .Saved.Error}}<div class="fail-box" role="alert"><p class="fail-label">The last attempt failed.</p>{{failure .}}</div>{{else}}<p>Eavesong fetches it every few hours. Get it now:</p>{{end}}
+  <form method="post" action="/p/{{.Project.ID}}/traffic/refresh"><button class="btn btn-primary" type="submit" data-busy="Fetching from Google…">Fetch traffic data</button></form>
+</div>
+{{else}}
+<div class="search-head">
+  <p class="hint">Google Analytics, {{.Report.Name}}, {{.Report.Start}} to {{.Report.End}}. Fetched {{ago .Saved.FetchedAt}}.</p>
+  <form method="post" action="/p/{{.Project.ID}}/traffic/refresh"><button class="btn btn-small" type="submit" data-busy="Fetching from Google…">Refresh</button></form>
+</div>
+{{if not .RefreshError}}{{with .Saved.Error}}<div class="flash flash-err" role="alert"><p class="fail-label">The last refresh failed, so these numbers are older.</p>{{failure .}}</div>{{end}}{{end}}
+
+<section class="figures" aria-label="Traffic summary">
+  <div><p>Visitors</p><strong>{{.Report.Users}}</strong>{{with .UsersChange}}<p class="change">{{.}}</p>{{end}}</div>
+  <div><p>Visits</p><strong>{{.Report.Sessions}}</strong>{{with .SessionsChange}}<p class="change">{{.}}</p>{{end}}</div>
+  <div><p>Page views</p><strong>{{.Report.Views}}</strong>{{with .ViewsChange}}<p class="change">{{.}}</p>{{end}}</div>
+  <div><p>Engaged visits</p><strong>{{printf "%.0f" .Report.Engaged}}%</strong><p class="change">{{printf "%.0f" .Report.AvgSeconds}} seconds on average</p></div>
+</section>
+
+<section class="day-section">
+  <h2>Visitors per day</h2>
+  {{.Chart}}
+  <p class="hint day-axis"><span>{{.Report.Start}}</span><span>{{.Report.End}}</span></p>
+</section>
+
+<section class="traffic-block">
+  <h2>From the places Eavesong listens</h2>
+  <p class="hint">Visits Google Analytics counted from each place, next to the mentions Eavesong found there in the same days. Many mentions with few visits usually means people talk about {{.Project.Name}} without linking to it.</p>
+{{if .Watched}}
+  <table class="search-table">
+    <thead><tr><th>Place</th><th class="num">Visits</th><th class="num">Mentions</th></tr></thead>
+    <tbody>
+{{range .Watched}}      <tr><td><span class="mark src-{{.Source}}" aria-hidden="true">{{sourceMark .Source}}</span> {{sourceName .Source}}</td><td class="num">{{.Visits}}</td><td class="num">{{.Mentions}}</td></tr>
+{{end}}    </tbody>
+  </table>
+{{else}}
+  <p class="hint">No visits or mentions from these places in this period.</p>
+{{end}}
+</section>
+
+<div class="report traffic-block">
+  <section>
+    <h2>Where visitors came from</h2>
+    <table class="search-table">
+      <thead><tr><th>Source</th><th class="num">Visits</th><th class="num">Engaged</th></tr></thead>
+      <tbody>
+{{range $i, $r := .Report.Sources}}{{if lt $i 25}}        <tr><td>{{$r.Key}}{{if and $r.Medium (ne $r.Medium "(none)")}} <span class="hint">{{$r.Medium}}</span>{{end}}</td><td class="num">{{$r.Sessions}}</td><td class="num">{{printf "%.0f" $r.Engaged}}%</td></tr>
+{{end}}{{else}}        <tr><td colspan="3" class="hint">No visits in this period.</td></tr>
+{{end}}      </tbody>
+    </table>
+  </section>
+  <section>
+{{if .Report.Channels}}
+    <h2>By channel</h2>
+    <table class="search-table table-gap">
+      <thead><tr><th>Channel</th><th class="num">Visits</th></tr></thead>
+      <tbody>
+{{range .Report.Channels}}        <tr><td>{{.Key}}</td><td class="num">{{.Sessions}}</td></tr>
+{{end}}      </tbody>
+    </table>
+{{end}}
+{{if .Report.Landing}}
+    <h2>Pages people land on</h2>
+    <table class="search-table">
+      <thead><tr><th>Page</th><th class="num">Visits</th></tr></thead>
+      <tbody>
+{{range $i, $r := .Report.Landing}}{{if lt $i 10}}        <tr><td class="path">{{$r.Key}}</td><td class="num">{{$r.Sessions}}</td></tr>
+{{end}}{{end}}      </tbody>
+    </table>
+{{end}}
+  </section>
+</div>
+
+{{if .Report.Pages}}
+<section>
+  <h2>Most read pages</h2>
+  <table class="search-table">
+    <thead><tr><th>Page</th><th class="num">Views</th><th class="num">Visitors</th></tr></thead>
+    <tbody>
+{{range .Report.Pages}}      <tr><td class="path">{{.Key}}</td><td class="num">{{.Views}}</td><td class="num">{{.Users}}</td></tr>
+{{end}}    </tbody>
+  </table>
+</section>
+{{end}}
+{{end}}
+{{template "bottom" .}}

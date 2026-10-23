@@ -1,0 +1,99 @@
+{{template "top" .}}
+{{template "phead" .}}
+<div id="live" data-url="/p/{{.Project.ID}}/activity" data-since="{{.Activity.LatestFound}}" data-checked="{{.Activity.LastCheck}}"{{if .Checking}} data-checking="1"{{end}}></div>
+{{if .Checking}}<p class="flash" role="status" id="checking-note">Checking every source now. This page reloads by itself when the check is done.</p>{{end}}
+<p class="flash flash-new" role="status" id="new-note" hidden><span></span> <a href="" id="new-show">Show them</a></p>
+
+<div class="triage">
+  <aside class="rail" aria-label="Filters">
+    <nav aria-label="Status">
+      <a href="{{.L.Status "new"}}"{{if eq .Filter.Status "new"}} aria-current="true"{{end}}>To review <span>{{index .StatusCounts "new"}}</span></a>
+      <a href="{{.L.Status "done"}}"{{if eq .Filter.Status "done"}} aria-current="true"{{end}}>Handled <span>{{index .StatusCounts "done"}}</span></a>
+      <a href="{{.L.Status "ignored"}}"{{if eq .Filter.Status "ignored"}} aria-current="true"{{end}}>Ignored <span>{{index .StatusCounts "ignored"}}</span></a>
+      <a href="{{.L.Status ""}}"{{if eq .Filter.Status ""}} aria-current="true"{{end}}>Everything <span>{{index .StatusCounts ""}}</span></a>
+    </nav>
+    <nav aria-label="Source">
+      <h2>Where</h2>
+      <a href="{{.L.Source ""}}"{{if eq .Filter.Source ""}} aria-current="true"{{end}}>All sources</a>
+{{range .SourceCounts}}      <a href="{{$.L.Source .Label}}"{{if eq $.Filter.Source .Label}} aria-current="true"{{end}}><i class="mark src-{{.Label}}" aria-hidden="true">{{sourceMark .Label}}</i>{{sourceName .Label}} <span>{{.N}}</span></a>
+{{end}}    </nav>
+    <nav aria-label="Topic">
+      <h2>About</h2>
+      <a href="{{.L.About ""}}"{{if eq .Filter.About ""}} aria-current="true"{{end}}>Everything</a>
+      <a href="{{.L.About "product"}}"{{if eq .Filter.About "product"}} aria-current="true"{{end}}>{{.Project.Name}}</a>
+      <a href="{{.L.About "competitor"}}"{{if eq .Filter.About "competitor"}} aria-current="true"{{end}}>Competitors</a>
+    </nav>
+    <a class="toggle" href="{{.L.Ours}}" role="switch" aria-checked="{{if .Filter.IncludeOurs}}true{{else}}false{{end}}">Show our own posts</a>
+  </aside>
+
+  <section class="stream" aria-label="Mentions">
+{{range .Mentions}}{{$body := clean .Body}}
+    <article class="m{{if .Decision}} m-{{.Decision}}{{end}}{{if .Ours}} m-ours{{end}}">
+      <i class="mark src-{{.Source}}" title="{{sourceName .Source}}">{{sourceMark .Source}}</i>
+      <div class="m-main">
+        <header class="m-head">
+          <p><strong>{{.Author}}</strong> in {{.Location}}{{if .Ours}} <em class="pill">ours</em>{{end}}{{if eq .About "competitor"}} <em class="pill pill-rival">competitor</em>{{end}}</p>
+          <time datetime="{{.PostedAt.Format "2006-01-02T15:04:05Z"}}" title="{{date .PostedAt}}">{{ago .PostedAt}}</time>
+        </header>
+        {{if .Title}}<h3 class="m-title"><a href="{{if .ContextURL}}{{.ContextURL}}{{else}}{{.URL}}{{end}}" target="_blank" rel="noopener noreferrer">{{.Title}}</a></h3>{{end}}
+        {{if .ContextText}}
+        <figure class="m-context">
+          <figcaption>In reply to <a href="{{.ContextURL}}" target="_blank" rel="noopener noreferrer">{{with contextAuthor .ContextURL}}@{{.}}{{else}}the original post{{end}}</a></figcaption>
+          <p>{{.ContextText}}</p>
+        </figure>
+        {{end}}
+        {{if $body}}<blockquote class="m-body">{{$body}}</blockquote>{{end}}
+        <p class="m-terms">{{if .Terms}}Matched {{join .Terms}}{{else}}A reply or mention in your account{{end}}{{if and .ContextURL (not .ContextText)}}. <a href="{{.ContextURL}}" target="_blank" rel="noopener noreferrer">View the {{if eq .Source "devto"}}article{{else}}original post{{end}}</a>{{end}}</p>
+
+        {{if eq .Decision "suggest"}}
+        <div class="note">
+          <p class="note-head">Suggested reply</p>
+          <p class="note-text">{{.Draft}}</p>
+          <p class="note-why">{{.Reason}}</p>
+          <button class="btn btn-small" type="button" data-copy="{{.Draft}}" data-usage="/m/{{.ID}}/usage">Copy reply</button>
+        </div>
+        {{else if eq .Decision "attention"}}
+        <div class="note note-attention">
+          <p class="note-head">Worth a personal look</p>
+          {{if .Draft}}<p class="note-text">{{.Draft}}</p>{{end}}
+          <p class="note-why">{{.Reason}}</p>
+          {{if .Draft}}<button class="btn btn-small" type="button" data-copy="{{.Draft}}" data-usage="/m/{{.ID}}/usage">Copy reply</button>{{end}}
+        </div>
+        {{else if eq .Decision "skip"}}
+        <p class="no-reply">No reply needed. {{.Reason}}</p>
+        {{end}}
+
+        <p class="hint">{{if .CopiedAt}}Draft copied {{.CopiedAt}} UTC. {{end}}{{if .RepliedAt}}You marked this replied {{.RepliedAt}} UTC.{{end}}</p>
+        <div class="m-actions">
+          <a class="btn btn-primary" href="{{.URL}}" target="_blank" rel="noopener noreferrer">Open thread</a>
+          {{if $.AI}}<form method="post" action="/m/{{.ID}}/draft"><button class="btn" type="submit" data-busy="Drafting…">{{if .Decision}}Draft again{{else}}Draft a reply{{end}}</button></form>{{end}}
+          <form method="post" action="/m/{{.ID}}/usage"><input type="hidden" name="event" value="{{if .RepliedAt}}unreplied{{else}}replied{{end}}"><button class="btn" type="submit">{{if .RepliedAt}}Undo replied{{else}}I replied{{end}}</button></form>
+          {{if ne .Status "ignored"}}<form method="post" action="/m/{{.ID}}/status"><input type="hidden" name="status" value="ignored"><button class="btn btn-quiet" type="submit">Ignore</button></form>{{end}}
+          {{if ne .Status "new"}}<form method="post" action="/m/{{.ID}}/status"><input type="hidden" name="status" value="new"><button class="btn btn-quiet" type="submit">Back to review</button></form>{{end}}
+        </div>
+      </div>
+    </article>
+{{else}}
+    <div class="empty">
+      {{if eq .Filter.Status "new"}}<p><strong>Nothing to review.</strong> Every mention so far has been handled or ignored.</p>
+      {{else}}<p><strong>No mentions match these filters.</strong></p>{{end}}
+      <p>Eavesong checks every {{if .Checks}}source on a timer{{else}}source a few seconds after a project is saved{{end}}; use <b>Check now</b> to look straight away.</p>
+    </div>
+{{end}}
+  </section>
+</div>
+
+<details class="checks">
+  <summary>Source status{{range .Checks}}{{if .Error}} <em class="pill pill-warn">a source had a problem</em>{{break}}{{end}}{{end}}</summary>
+{{if .Checks}}
+  <table>
+    <thead><tr><th>Source</th><th>Last check</th><th class="num">Matched</th><th class="num">New</th><th>Problem</th></tr></thead>
+    <tbody>
+{{range .Checks}}      <tr><td>{{sourceName .Source}}</td><td>{{ago .At}}</td><td class="num">{{.Found}}</td><td class="num">{{.Added}}</td><td class="err">{{.Error}}</td></tr>
+{{end}}    </tbody>
+  </table>
+{{else}}
+  <p>No checks have run yet.</p>
+{{end}}
+</details>
+{{template "bottom" .}}

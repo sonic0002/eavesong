@@ -1,0 +1,45 @@
+{{define "top"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} – Eavesong</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="/static/eavesong.svg" type="image/svg+xml">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/"><img src="/static/eavesong.svg" alt="" width="26" height="26"><span>Eavesong</span></a>
+  <nav class="projects" aria-label="Projects">
+{{range .Projects}}    <a href="/p/{{.ID}}"{{if eq .ID $.Current}} aria-current="page"{{end}}>{{.Name}}</a>
+{{end}}    <a class="add" href="/settings/0">New project</a>
+  </nav>
+  <a class="gear" href="/settings"{{if eq .Current -1}} aria-current="page"{{end}}>Settings</a>
+</header>
+<main class="page">
+{{end}}
+
+{{define "bottom"}}</main>
+<footer class="foot">Eavesong only reads. It never posts, votes or replies for you.</footer>
+</body>
+</html>{{end}}
+
+{{define "phead"}}<section class="phead">
+  <div class="phead-name">
+    <h1>{{.Project.Name}}</h1>
+    <p class="watching">Listening for {{range $i, $t := .Project.Domains}}{{if $i}}, {{end}}<b>{{$t}}</b>{{end}}{{range $i, $t := .Project.Keywords}}{{if or $i $.Project.Domains}}, {{end}}<b>{{$t}}</b>{{end}}{{with .Project.Competitors}} and {{len .}} competitor{{if gt (len .) 1}}s{{end}}{{end}}</p>
+  </div>
+  <figure class="pulse">
+    {{.Pulse}}
+    <figcaption><strong>{{.PulseTotal}}</strong> mention{{if ne .PulseTotal 1}}s{{end}} by others in 14 days</figcaption>
+  </figure>
+  <form method="post" action="/p/{{.Project.ID}}/check"><button class="btn" type="submit">Check now</button></form>
+</section>
+<nav class="tabs" aria-label="Project">
+  <a href="/p/{{.Project.ID}}"{{if eq .Tab "inbox"}} aria-current="page"{{end}}>Inbox</a>
+  <a href="/p/{{.Project.ID}}/report"{{if eq .Tab "report"}} aria-current="page"{{end}}>Report</a>
+  <a href="/p/{{.Project.ID}}/search"{{if eq .Tab "search"}} aria-current="page"{{end}}>Search</a>
+  <a href="/p/{{.Project.ID}}/traffic"{{if eq .Tab "traffic"}} aria-current="page"{{end}}>Traffic</a>
+  <a href="/settings/{{.Project.ID}}"{{if eq .Tab "settings"}} aria-current="page"{{end}}>Settings</a>
+</nav>{{end}}

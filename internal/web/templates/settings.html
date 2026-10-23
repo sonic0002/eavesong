@@ -1,0 +1,87 @@
+{{template "top" .}}
+{{if .Project.ID}}{{template "phead" .}}{{else}}
+<section class="phead phead-new">
+  <div class="phead-name">
+    <h1>Watch a product</h1>
+    <p class="watching">{{if not .Projects}}Step 1 of 3: tell Eavesong what to listen for. After saving, you can connect accounts and choose an AI provider.{{else}}Tell Eavesong what to listen for. The first check starts as soon as you save.{{end}}</p>
+  </div>
+</section>
+{{end}}
+
+{{if .Saved}}<p class="flash flash-ok" role="status">Project settings saved.</p>{{end}}
+<form class="settings" method="post" action="/settings/{{.Project.ID}}">
+  <div class="field">
+    <label for="name">Product name</label>
+    <input id="name" name="name" value="{{.Project.Name}}" required placeholder="Acme">
+  </div>
+  <div class="field">
+    <label for="description">Product facts for reply drafts</label>
+    <p class="hint" id="description-hint">Describe what your product does, who it helps, and facts a reply may safely mention. This is sent to your AI provider with each draft. Leave it blank if you do not want to provide product context.</p>
+    <textarea id="description" name="description" rows="4" maxlength="6000" aria-describedby="description-hint" placeholder="Acme helps small teams monitor their websites. It checks every 5 minutes and sends alerts by email. The free plan covers one website.">{{.Project.Description}}</textarea>
+  </div>
+  <div class="field">
+    <label for="domains">Websites</label>
+    <p class="hint" id="domains-hint">One per line. Any post that links these is a mention.</p>
+    <textarea id="domains" name="domains" rows="2" aria-describedby="domains-hint" placeholder="acme.dev">{{lines .Project.Domains}}</textarea>
+  </div>
+  <div class="field">
+    <label for="keywords">Names people use for it</label>
+    <p class="hint" id="keywords-hint">One per line. Skip names that are also common words or code identifiers; they bring in unrelated posts.</p>
+    <textarea id="keywords" name="keywords" rows="3" aria-describedby="keywords-hint" placeholder="Acme&#10;acme-cli">{{lines .Project.Keywords}}</textarea>
+  </div>
+  <div class="field">
+    <label for="competitors">Competitors</label>
+    <p class="hint" id="competitors-hint">Product names, one per line. Their mentions are collected separately and compared in the report.</p>
+    <textarea id="competitors" name="competitors" rows="3" aria-describedby="competitors-hint" placeholder="Rival">{{lines .Project.Competitors}}</textarea>
+  </div>
+  <div class="field">
+    <label for="tone">Reply tone</label>
+    <p class="hint" id="tone-hint">How replies should sound. The draft still adapts to the conversation and the platform.</p>
+    <input id="tone" name="tone" value="{{.Project.Tone}}" maxlength="200" aria-describedby="tone-hint" placeholder="Friendly, direct, and practical">
+  </div>
+  <div class="field">
+    <label for="reply_length">Reply length</label>
+    <p class="hint" id="reply-length-hint">Your preferred length for a useful answer. Keep it short for public conversations.</p>
+    <input id="reply_length" name="reply_length" value="{{.Project.ReplyLength}}" maxlength="200" aria-describedby="reply-length-hint" placeholder="1–2 short sentences">
+  </div>
+  <div class="field">
+    <label for="avoid_words">Words to avoid</label>
+    <p class="hint" id="avoid-words-hint">Words or phrases you do not want in drafts. Separate them with commas or new lines.</p>
+    <textarea id="avoid_words" name="avoid_words" rows="2" maxlength="1000" aria-describedby="avoid-words-hint" placeholder="game-changing, seamless, revolutionary">{{.Project.AvoidWords}}</textarea>
+  </div>
+  <div class="field">
+    <label for="examples">Example replies to imitate</label>
+    <p class="hint" id="examples-hint">Paste one or two replies you have written. The AI uses them for style, not as proof of product facts.</p>
+    <textarea id="examples" name="examples" rows="4" maxlength="6000" aria-describedby="examples-hint" placeholder="Good question. You can set this up in Settings; it takes about a minute. If anything is unclear, tell us where you got stuck.">{{.Project.Examples}}</textarea>
+  </div>
+  <div class="field">
+    <label class="check-label"><input type="checkbox" name="read_links" value="1"{{if .Project.ReadLinks}} checked{{end}}> Read the linked page when drafting</label>
+    <p class="hint">When a mention has a public original-post or article link, Eavesong tries to read that page for context. Its text is sent to your AI provider. It does not read a separate docs URL. If the page is unavailable, drafting continues without it.</p>
+  </div>
+  <fieldset class="field accounts">
+    <legend>Other names that are yours</legend>
+    <p class="hint">Posts by these usernames are hidden from the inbox, so you don't review your own posts. Accounts connected below are recognised already; add any others here, such as teammates or old accounts. Type a username, @handle or profile link and press Enter.</p>
+{{range .Platforms}}    <div class="account">
+      <label for="own_{{.Key}}">{{if eq .Key "other"}}<i class="mark mark-any" aria-hidden="true">*</i>{{else}}<i class="mark src-{{.Key}}" aria-hidden="true">{{sourceMark .Key}}</i>{{end}}{{.Name}}</label>
+      <input id="own_{{.Key}}" name="own_{{.Key}}" value="{{join ($.Project.AccountsFor .Key)}}" placeholder="{{.Placeholder}}" spellcheck="false" autocapitalize="off" data-chips>
+    </div>
+{{end}}  </fieldset>
+  <fieldset class="field my-accounts">
+    <legend>Connected accounts that feed this inbox</legend>
+    {{if .MyAccounts}}
+    <p class="hint">Replies, mentions and comments received by the ticked accounts go to this project's inbox. Untick accounts that belong to another product.</p>
+    <input type="hidden" name="accounts_shown" value="1">
+    <ul>
+{{range .MyAccounts}}      <li><label><input type="checkbox" name="use_account" value="{{.ID}}"{{if .Here}} checked{{end}}{{if .FromEnv}} disabled{{end}}>
+        <i class="mark src-{{.Platform}}" aria-hidden="true">{{sourceMark .Platform}}</i> {{.Prefix}}{{.Name}}</label>
+        <span class="quiet">{{if .FromEnv}}set by an environment variable, used for all projects{{else}}now used for {{.UsedFor}}{{end}}</span></li>
+{{end}}    </ul>
+    {{else}}
+    <p class="hint">None yet. Connect your Bluesky, Reddit, Mastodon, DEV, Facebook or X accounts in <a href="/settings#mine">Settings</a> to collect their replies and mentions.</p>
+    {{end}}
+  </fieldset>
+  <button class="btn btn-primary" type="submit">{{if .Project.ID}}Save changes{{else}}Start watching{{end}}</button>
+</form>
+
+<p class="hint more">Accounts, API keys and reply drafts are added for the whole installation in <a href="/settings">Settings</a>.</p>
+{{template "bottom" .}}

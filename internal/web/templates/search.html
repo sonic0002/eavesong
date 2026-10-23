@@ -1,0 +1,130 @@
+{{template "top" .}}
+{{template "phead" .}}
+
+{{if .Refreshed}}<p class="flash flash-ok" role="status">Search data refreshed from Google.</p>{{end}}
+{{if .HasReport}}{{with .RefreshError}}<div class="flash flash-err" role="alert">{{failure .}}</div>{{end}}{{end}}
+{{if .Fetching}}<p class="flash" role="status" data-fetch-status="/p/{{.Project.ID}}/search/status">Getting the latest numbers from Google. This page updates by itself in a few seconds.</p>{{end}}
+
+{{if not .Connected}}
+<div class="empty">
+  <p><strong>Search Console is not connected.</strong></p>
+  <p>Connect a read-only service-account key in <a href="/settings?open=searchconsole#accounts-searchconsole">Settings</a> to see which Google searches bring people to {{.Project.Name}}.</p>
+</div>
+{{else if not .HasReport}}
+<div class="empty">
+  <p><strong>No search data yet.</strong></p>
+  {{with or .RefreshError .Saved.Error}}<div class="fail-box" role="alert"><p class="fail-label">The last attempt failed.</p>{{failure .}}</div>{{else}}<p>Eavesong fetches it once a day. Get it now:</p>{{end}}
+  <form method="post" action="/p/{{.Project.ID}}/search/refresh"><button class="btn btn-primary" type="submit" data-busy="Fetching from Google…">Fetch search data</button></form>
+</div>
+{{else}}
+<div class="search-head">
+  <p class="hint">Google Search Console, {{.Report.Property}}, {{.Report.Start}} to {{.Report.End}}. Google reports two to three days late. Fetched {{ago .Saved.FetchedAt}}.</p>
+  <form method="post" action="/p/{{.Project.ID}}/search/refresh"><button class="btn btn-small" type="submit" data-busy="Fetching from Google…">Refresh</button></form>
+</div>
+{{if not .RefreshError}}{{with .Saved.Error}}<div class="flash flash-err" role="alert"><p class="fail-label">The last refresh failed, so these numbers are older.</p>{{failure .}}</div>{{end}}{{end}}
+
+<section class="figures" aria-label="Search summary">
+  <div><p>Clicks from Google</p><strong>{{.Report.Clicks}}</strong></div>
+  <div><p>Times shown in results</p><strong>{{.Report.Impressions}}</strong></div>
+  <div><p>Click-through rate</p><strong>{{printf "%.1f" .CTR}}%</strong></div>
+  <div><p>Average position</p><strong>{{printf "%.1f" .Position}}</strong></div>
+</section>
+
+<section class="todo" aria-labelledby="todo-heading">
+  <div class="todo-head">
+    <h2 id="todo-heading">What to do next</h2>
+    {{if .HasWriter}}<form method="post" action="/p/{{.Project.ID}}/search/plan"><button class="btn btn-small" type="submit" data-busy="Writing the plan…">{{if .Plan}}Ask AI for a new plan{{else}}Ask AI for a plan{{end}}</button></form>{{end}}
+  </div>
+  <p class="hint">Worked out from the numbers below, most valuable first. Each one names the search and the page to work on.{{if not .HasWriter}} With an AI provider set in <a href="/settings">Settings</a>, Eavesong can also turn these into a written plan.{{end}}</p>
+  {{with .PlanError}}<p class="flash flash-err" role="alert">No plan: {{.}}.</p>{{end}}
+{{if .Recs}}
+  <ol class="recs">
+{{range .Recs}}    <li class="rec kind-{{.Kind}}">
+      <span class="rec-kind">{{.Label}}</span>
+      <p class="rec-title">{{.Title}}</p>
+      <p class="rec-detail">{{.Detail}}</p>
+      {{template "rec-action" (group $ .)}}
+      {{if .Page}}<a class="rec-link" href="{{.Page}}" target="_blank" rel="noopener noreferrer">Open the page</a>{{end}}
+    </li>
+{{end}}  </ol>
+  {{if .MoreRecs}}<details class="more-recs"><summary>{{len .MoreRecs}} smaller ones</summary>
+    <ol class="recs">
+{{range .MoreRecs}}      <li class="rec kind-{{.Kind}}"><span class="rec-kind">{{.Label}}</span><p class="rec-title">{{.Title}}</p><p class="rec-detail">{{.Detail}}</p>{{template "rec-action" (group $ .)}}</li>
+{{end}}    </ol>
+  </details>{{end}}
+{{else}}
+  <p class="hint">Nothing stands out yet. Recommendations appear as Google shows the site for more searches.</p>
+{{end}}
+{{if .RecActions}}
+<details><summary>Recommendation follow-through ({{len .RecActions}})</summary>
+<p class="hint">Checked again after each successful refresh. A finding disappearing does not prove that an action caused an improvement.</p>
+{{range .RecActions}}<p><strong>{{.Title}}</strong> — {{.Status}}. {{if .CheckedAt}}{{.Result}} at {{.CheckedAt}} UTC.{{else}}Waiting for the next refresh.{{end}}</p>
+<form method="post" action="/p/{{$.Project.ID}}/search/recommendation"><input type="hidden" name="key" value="{{.Key}}"><button class="btn btn-small" name="status" value="open">Reopen</button></form>{{end}}
+</details>{{end}}
+{{with .Plan}}
+  <div class="plan" id="plan">
+    <p class="plan-head">AI plan, written {{ago .At}} by {{.Provider}} from data for {{.Period}}</p>
+    <div class="plan-text">{{.Text}}</div>
+  </div>
+{{end}}
+</section>
+
+<div class="report">
+  <section>
+    <h2>Searches you appear for</h2>
+    <p class="hint">The 25 shown most often. Many impressions with few clicks usually means the title or description doesn't match what people searched.</p>
+    <table class="search-table">
+      <thead><tr><th>Search</th><th class="num">Clicks</th><th class="num">Shown</th><th class="num">Position</th></tr></thead>
+      <tbody>
+{{range $i, $r := .Report.Queries}}{{if lt $i 25}}        <tr><td>{{$r.Key}}</td><td class="num">{{$r.Clicks}}</td><td class="num">{{$r.Impressions}}</td><td class="num">{{printf "%.1f" $r.Position}}</td></tr>
+{{end}}{{else}}        <tr><td colspan="4" class="hint">No searches in this period.</td></tr>
+{{end}}      </tbody>
+    </table>
+  </section>
+  <section>
+    <h2>Almost on page one</h2>
+    <p class="hint">Searches where you average position 8 to 20. A focused page or a better title can move these up fastest.</p>
+{{if .Report.PageTwo}}
+    <ul class="followups">
+{{range .Report.PageTwo}}      <li class="is-suggest"><b>{{.Key}}</b> <span>position {{printf "%.1f" .Position}}, shown {{.Impressions}} times</span></li>
+{{end}}    </ul>
+{{else}}
+    <p class="hint">None yet.</p>
+{{end}}
+{{if .Report.Sitemaps}}
+    <h2>Sitemaps</h2>
+    <ul class="followups">
+{{range .Report.Sitemaps}}      <li class="{{if .Errors}}is-attention{{else}}is-suggest{{end}}"><span class="path">{{.Path}}</span> <span>{{if .Errors}}{{.Errors}} errors{{else}}no errors{{end}}{{if .Warnings}}, {{.Warnings}} warnings{{end}}</span></li>
+{{end}}    </ul>
+{{end}}
+  </section>
+</div>
+
+<section>
+  <h2>Pages in search results</h2>
+  <table class="search-table">
+    <thead><tr><th>Page</th><th class="num">Clicks</th><th class="num">Shown</th><th class="num">Position</th></tr></thead>
+    <tbody>
+{{range $i, $r := .Report.Pages}}{{if lt $i 25}}      <tr><td><a href="{{$r.Key}}" target="_blank" rel="noopener noreferrer">{{$r.Key}}</a></td><td class="num">{{$r.Clicks}}</td><td class="num">{{$r.Impressions}}</td><td class="num">{{printf "%.1f" $r.Position}}</td></tr>
+{{end}}{{end}}    </tbody>
+  </table>
+</section>
+{{end}}
+{{if .History}}
+<section class="more">
+<h2>Search history</h2>
+<p class="hint">One snapshot per UTC fetch day, keeping the latest successful refresh that day. Each snapshot covers its own 28-day report period; overlapping periods are not added together. History starts with the saved report available at upgrade.</p>
+<form method="get"><label for="compare">Compare current report with</label> <select id="compare" name="compare">{{range .History}}<option value="{{.Day}}"{{if eq $.CompareDay .Day}} selected{{end}}>{{.Day}} ({{.Report.Start}} to {{.Report.End}})</option>{{end}}</select> <button class="btn btn-small">Compare</button></form>
+{{with .Comparison}}<p>Compared with the snapshot from {{.Day}} ({{.Report.Start}} to {{.Report.End}}): clicks changed by {{$.ClickChange}}, impressions by {{$.ImpressionChange}}.</p>{{end}}
+<details><summary>All daily snapshots</summary><table><thead><tr><th>Saved</th><th>Period</th><th>Clicks</th><th>Impressions</th></tr></thead><tbody>{{range .History}}<tr><td>{{.Day}}</td><td>{{.Report.Start}} – {{.Report.End}}</td><td>{{.Report.Clicks}}</td><td>{{.Report.Impressions}}</td></tr>{{end}}</tbody></table></details>
+</section>{{end}}
+{{template "bottom" .}}
+
+{{define "rec-action"}}
+{{$key := recKey .List}}
+{{$status := index .Root.RecStates $key}}
+<form method="post" action="/p/{{.Root.Project.ID}}/search/recommendation">
+<input type="hidden" name="key" value="{{$key}}">
+{{if $status}}<span class="hint">{{$status}}</span> <button class="btn btn-small" name="status" value="open">Reopen</button>{{else}}<button class="btn btn-small" name="status" value="done">Mark done</button> <button class="btn btn-small" name="status" value="dismissed">Dismiss</button>{{end}}
+</form>
+{{end}}

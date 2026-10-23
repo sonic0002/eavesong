@@ -1,0 +1,7 @@
+/eavesong
+*.db
+*.db-shm
+*.db-wal
+.env
+*.key
+/docs/

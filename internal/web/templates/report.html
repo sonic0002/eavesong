@@ -1,0 +1,50 @@
+{{template "top" .}}
+{{template "phead" .}}
+
+<nav class="range" aria-label="Period">
+  <a href="?days=7"{{if eq .Days 7}} aria-current="page"{{end}}>7 days</a>
+  <a href="?days=30"{{if eq .Days 30}} aria-current="page"{{end}}>30 days</a>
+  <a href="?days=90"{{if eq .Days 90}} aria-current="page"{{end}}>90 days</a>
+</nav>
+
+<p class="lede">People mentioned {{.Project.Name}}{{if .Project.Competitors}} or a competitor{{end}} <strong>{{.Total}}</strong> time{{if ne .Total 1}}s{{end}} in the last {{.Days}} days.</p>
+
+<div class="report">
+  <section>
+    <h2>Share of voice</h2>
+    <p class="hint">How often each tracked name came up. Your names are in amber.</p>
+    <table class="voice">
+      <tbody>
+{{range .Voice}}        <tr><th scope="row">{{.Label}}</th><td>{{bar .N $.MaxVoice (index $.IsProduct .Label)}}</td><td class="num">{{.N}}</td></tr>
+{{end}}      </tbody>
+    </table>
+  </section>
+  <section>
+    <h2>Where it happened</h2>
+{{if .BySource}}
+    <table>
+      <tbody>
+{{range .BySource}}        <tr><th scope="row"><i class="mark src-{{.Label}}" aria-hidden="true">{{sourceMark .Label}}</i>{{sourceName .Label}}</th><td class="num">{{.N}}</td></tr>
+{{end}}      </tbody>
+    </table>
+{{else}}
+    <p class="hint">No mentions in this period.</p>
+{{end}}
+  </section>
+</div>
+
+<section>
+  <h2>Needed a reply or a look</h2>
+{{if .Attention}}
+  <ul class="followups">
+{{range .Attention}}    <li class="{{if eq .Decision "attention"}}is-attention{{else}}is-suggest{{end}}">
+      <i class="mark src-{{.Source}}" aria-hidden="true">{{sourceMark .Source}}</i>
+      <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{if .Title}}{{.Title}}{{else}}{{sourceName .Source}} post by {{.Author}}{{end}}</a>
+      <span>{{ago .PostedAt}}, {{if eq .Status "done"}}handled{{else if eq .Status "ignored"}}ignored{{else}}still to review{{end}}</span>
+    </li>
+{{end}}  </ul>
+{{else}}
+  <p class="hint">Nothing needed a reply in this period{{if not $.Total}}, and nothing was found yet{{end}}.</p>
+{{end}}
+</section>
+{{template "bottom" .}}

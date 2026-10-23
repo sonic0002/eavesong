@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Eavesong is a self-hosted listening desk for product mentions, thoughtful reply drafts, search visibility and traffic.">
+  <meta name="theme-color" content="#111b25">
+  <title>Eavesong — hear what matters about your product</title>
+  <link rel="icon" href="assets/eavesong.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar wrap">
+    <a class="brand" href="#top" aria-label="Eavesong home"><img src="assets/eavesong.svg" width="30" height="30" alt=""><span>Eavesong</span></a>
+    <nav aria-label="Main navigation"><a href="#how">How it works</a><a href="#inside">Inside Eavesong</a><a href="#self-host">Self-hosting</a></nav>
+    <a class="top-link" href="https://github.com/sonic0002/eavesong">View source <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <main id="top">
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="signal" aria-hidden="true"></span> A quieter way to listen</p>
+        <h1>Hear what matters<br><em>about your product.</em></h1>
+        <p class="lead">People talk about your product across forums, social feeds and search. Eavesong brings the useful conversations into one place, helps you decide when to reply, and shows what changed.</p>
+        <div class="hero-actions"><a class="button primary" href="#inside">Take a look <span aria-hidden="true">↘</span></a><a class="button secondary" href="#self-host">How to run it</a></div>
+        <p class="hero-note">Self-hosted. Never posts for you. Optional integrations are your choice.</p>
+      </div>
+      <div class="hero-art" aria-label="Illustrative Eavesong inbox preview with sample data">
+        <div class="halo"></div>
+        <div class="preview-caption"><span class="dot"></span> PRODUCT PREVIEW <span class="preview-example">Illustrative sample data</span></div>
+        <div class="app-window">
+          <div class="app-bar"><div class="app-brand"><img src="assets/eavesong.svg" width="17" height="17" alt=""> Eavesong</div><div class="app-project">Acme <span>⌄</span></div><div class="app-settings">Settings</div></div>
+          <div class="app-tabs"><span class="selected">Inbox</span><span>Report</span><span>Search</span><span>Traffic</span></div>
+          <div class="app-content"><div class="app-rail"><strong>To review <b>3</b></strong><span>Handled</span><span>Ignored</span><hr><small>WHERE</small><span>All sources</span><span>Reddit</span><span>Hacker News</span><span>Bluesky</span></div><div class="app-feed"><div class="feed-top"><span>Recent conversations</span><span>Newest first ⌄</span></div><article class="mention"><div class="mention-meta"><span class="source-icon reddit">r</span><span><b>littlecloud</b> in r/selfhosted</span><time>2h ago</time></div><h3>Looking for a simple uptime monitor</h3><p>Anyone using something small for a few sites? I mainly need quick alerts when a page goes down.</p><div class="draft"><strong>Suggested reply</strong><p>Acme checks sites every five minutes and sends email alerts. If you share what you monitor, I can say whether it fits.</p></div><div class="mention-actions"><span>Open thread</span><span>I replied</span><span>Ignore</span></div></article><article class="mention compact"><div class="mention-meta"><span class="source-icon hn">Y</span><span><b>riverstone</b> on Hacker News</span><time>5h ago</time></div><h3>Monitoring tools that stay out of the way</h3><p>Acme came up in a discussion about lightweight tools.</p><div class="personal-look">Worth a personal look</div></article></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="quiet-band" aria-label="Product principles"><div class="wrap principle-grid"><p><span>01</span> Listen across the places people actually talk.</p><p><span>02</span> Reply with care, in your own voice.</p><p><span>03</span> Know what attention turned into.</p></div></section>
+
+    <section class="story wrap" id="how"><div class="section-intro"><p class="eyebrow">FROM NOISE TO SIGNAL</p><h2>One calm place<br>for the whole story.</h2></div><div class="story-steps"><article><span class="step-no">01 / FIND</span><h3>Catch the conversation</h3><p>Track your product name, domain and competitors across sources such as Reddit, Hacker News, Bluesky, GitHub and YouTube. Mentions arrive in one inbox with a link back to the original post.</p></article><article><span class="step-no">02 / DECIDE</span><h3>Spend attention where it counts</h3><p>Eavesong flags the posts that deserve a personal look. With your chosen AI provider, it can suggest a short reply using the product facts and style you provide. You decide what to say.</p></article><article><span class="step-no">03 / LEARN</span><h3>See the wider pattern</h3><p>Reports compare your mentions with competitors. Optional Search Console and Analytics connections add search visibility and traffic beside the conversations that brought people in.</p></article></div></section>
+
+    <section class="inside" id="inside"><div class="wrap inside-grid"><div class="inside-copy"><p class="eyebrow">A DESK, NOT A DASHBOARD MAZE</p><h2>The conversation,<br>with context.</h2><p>Every mention stays close to its source and thread. Review it, open the original, copy a suggested reply if it helps, then move on. The product never posts on your behalf.</p><div class="inside-list"><div><b>Inbox</b><span>Find what needs a response.</span></div><div><b>Report</b><span>Compare mentions and share of voice.</span></div><div><b>Search + Traffic</b><span>Connect read-only Google data when you want it.</span></div></div></div><div class="report-preview" role="img" aria-label="Illustrative sample report showing mentions by source and share of voice"><div class="report-head"><span>REPORT <small>Illustrative sample data</small></span><span>Last 7 days ⌄</span></div><h3>A week, in focus.</h3><div class="report-stats"><div><strong>24</strong><span>mentions found</span></div><div><strong>8</strong><span>needed a reply</span></div></div><div class="chart-title">Share of voice</div><div class="bar-row"><span>Acme</span><i><b style="width: 68%"></b></i><em>17</em></div><div class="bar-row rival"><span>Rival</span><i><b style="width: 28%"></b></i><em>7</em></div><div class="chart-title lower">Where it happened</div><div class="source-row"><span>Reddit</span><b>11</b></div><div class="source-row"><span>Hacker News</span><b>8</b></div><div class="source-row"><span>Bluesky</span><b>5</b></div></div></div></section>
+
+    <section class="host wrap" id="self-host"><div><p class="eyebrow">YOUR MACHINE, YOUR RULES</p><h2>Keep the listening<br>in your hands.</h2><p>Eavesong runs as one Go app with a SQLite database. API keys are encrypted before storage. You can use Anthropic, DeepSeek, Gemini, an OpenAI-compatible service, or a local model for drafts. Leave AI off and keep the inbox and reports.</p><p>New installs start with a short setup flow. Notifications and weekly reports are optional, so the product stays quiet until you choose what matters.</p></div><div class="terminal"><div class="terminal-title"><span><i></i><i></i><i></i></span> QUICK START</div><pre><code><span># Set a password in .env, then:</span>
+docker compose up -d
+
+<span># Open the local app:</span>
+http://127.0.0.1:8080</code></pre><p>The first public release is being prepared. Source and install instructions will be available in the repository.</p><a href="https://github.com/sonic0002/eavesong">Follow the release <span aria-hidden="true">↗</span></a></div></section>
+  </main>
+
+  <footer class="footer"><div class="wrap footer-inner"><div><a class="brand" href="#top"><img src="assets/eavesong.svg" width="26" height="26" alt=""><span>Eavesong</span></a><p>Listen closely. Reply thoughtfully.</p></div><div><a href="https://github.com/sonic0002/eavesong">Source</a><a href="https://github.com/sonic0002/eavesong/blob/master/LICENSE">AGPL-3.0</a></div><small>© 2026 Eavesong</small></div></footer>
+</body>
+</html>
