@@ -5,3 +5,4 @@
 .env
 *.key
 /docs/
+.DS_Store
