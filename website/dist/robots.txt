@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://eavesong.com/sitemap.xml
