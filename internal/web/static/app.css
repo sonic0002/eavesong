@@ -315,6 +315,8 @@ textarea { resize: vertical; }
 .src-youtube { background: #e62117; }
 .src-facebook { background: #1877f2; font-size: .85em; }
 .src-googlealerts { background: #188038; }
+.src-producthunt { background: #da552f; }
+.src-bing { background: #008373; }
 .fields { display: grid; gap: .55rem; }
 .field-input { display: grid; gap: .25rem; font-size: .88rem; font-weight: 600; }
 .field-input em { font-style: normal; font-weight: 400; color: var(--muted); }

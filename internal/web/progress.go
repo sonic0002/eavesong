@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/sonic0002/eavesong/internal/gsc"
 	"github.com/sonic0002/eavesong/internal/store"
@@ -35,19 +36,31 @@ func (s *Server) recommendation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	http.Redirect(w, r, "/p/"+strconv.FormatInt(id(r), 10)+"/search", http.StatusSeeOther)
+	engine := ""
+	if strings.HasPrefix(r.FormValue("key"), "bing:") {
+		engine = "bing"
+	}
+	http.Redirect(w, r, "/p/"+strconv.FormatInt(id(r), 10)+"/search"+engineQuery(engine), http.StatusSeeOther)
 }
-func (s *Server) searchProgress(ctx context.Context, projectID int64, report gsc.Report, data map[string]any) error {
-	actions, err := s.Store.RecommendationActions(ctx, projectID)
+func (s *Server) searchProgress(ctx context.Context, engine string, projectID int64, report gsc.Report, data map[string]any) error {
+	all, err := s.Store.RecommendationActions(ctx, projectID)
 	if err != nil {
 		return err
 	}
 	states := map[string]string{}
-	for _, a := range actions {
+	var actions []store.RecommendationAction
+	for _, a := range all {
+		if strings.HasPrefix(a.Key, "bing:") != (engine == "bing") {
+			continue // the other engine's follow-through
+		}
 		states[a.Key] = a.Status
+		actions = append(actions, a)
 	}
 	data["RecStates"], data["RecActions"] = states, actions
 	history, err := s.Store.SearchHistory(ctx, projectID)
+	if engine == "bing" {
+		history, err = s.Store.BingHistory(ctx, projectID)
+	}
 	if err != nil {
 		return err
 	}

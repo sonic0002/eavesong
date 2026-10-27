@@ -180,8 +180,8 @@ document.querySelectorAll('input[data-chips]').forEach(function (field) {
   }
 })();
 
-// Search and Traffic tabs: when opening one started a fetch from Google,
-// reload once the fetch has finished so the new numbers show.
+// Search and Traffic tabs: when opening one started a fetch from Google or
+// Bing, reload once the fetch has finished so the new numbers show.
 (function () {
   var note = document.querySelector('[data-fetch-status]');
   if (!note) return;
@@ -193,7 +193,8 @@ document.querySelectorAll('input[data-chips]').forEach(function (field) {
       .then(function (s) {
         if (s && !s.fetching) {
           clearInterval(timer);
-          location.replace(location.pathname);
+          var engine = new URLSearchParams(location.search).get('engine');
+          location.replace(location.pathname + (engine ? '?engine=' + encodeURIComponent(engine) : ''));
         }
       })
       .catch(function () {});

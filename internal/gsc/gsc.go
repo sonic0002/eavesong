@@ -232,6 +232,7 @@ type Row struct {
 
 // Report is what the Search tab shows.
 type Report struct {
+	Engine      string    `json:"engine,omitempty"` // "" for Google, "bing" for Bing Webmaster Tools
 	Property    string    `json:"property"`
 	Start       string    `json:"start"`
 	End         string    `json:"end"`
@@ -255,6 +256,7 @@ type Sitemap struct {
 	LastDownloaded string `json:"last_downloaded"`
 	Errors         int    `json:"errors"`
 	Warnings       int    `json:"warnings"`
+	Status         string `json:"status,omitempty"` // Bing's word for the sitemap's state
 }
 
 func (c *Client) rows(ctx context.Context, property, start, end, dimension string, limit int) ([]Row, error) {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/sonic0002/eavesong/internal/gsc"
@@ -74,9 +75,42 @@ func (s *Store) RecordDraftUsage(ctx context.Context, id int64, event string) er
 	return err
 }
 
-func (s *Store) saveSearchHistory(ctx context.Context, projectID int64, data, problem string) error {
+// migrateBing adds the tables for Bing Webmaster Tools data. Bing has its own
+// tables so Google's, saved by earlier versions, stay exactly as they were.
+func migrateBing(db *sql.DB) error {
+	_, err := db.Exec(`
+ CREATE TABLE IF NOT EXISTS bing_reports (
+ project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+ fetched_at TEXT NOT NULL, error TEXT NOT NULL DEFAULT '', data TEXT NOT NULL DEFAULT '');
+ CREATE TABLE IF NOT EXISTS bing_snapshots (
+ project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+ day TEXT NOT NULL, fetched_at TEXT NOT NULL, data TEXT NOT NULL,
+ PRIMARY KEY(project_id, day));
+ `)
+	return err
+}
+
+// searchTables names the report and snapshot tables of a search engine:
+// "" is Google, "bing" is Bing.
+func searchTables(engine string) (reports, snapshots string) {
+	if engine == "bing" {
+		return "bing_reports", "bing_snapshots"
+	}
+	return "search_reports", "search_snapshots"
+}
+
+// ofEngine limits recommendation_actions to one engine's keys; Bing's start with "bing:".
+func ofEngine(engine string) string {
+	if engine == "bing" {
+		return ` AND key LIKE 'bing:%'`
+	}
+	return ` AND key NOT LIKE 'bing:%'`
+}
+
+func (s *Store) saveSearchHistory(ctx context.Context, engine string, projectID int64, data, problem string) error {
+	reports, snapshots := searchTables(engine)
 	if data == "" {
-		return s.saveReport(ctx, "search_reports", projectID, data, problem)
+		return s.saveReport(ctx, reports, projectID, data, problem)
 	}
 	var report gsc.Report
 	if err := json.Unmarshal([]byte(data), &report); err != nil {
@@ -88,15 +122,15 @@ func (s *Store) saveSearchHistory(ctx context.Context, projectID int64, data, pr
 	}
 	defer tx.Rollback()
 	at := now()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO search_reports(project_id, fetched_at, error, data) VALUES (?, ?, '', ?)
+	if _, err = tx.ExecContext(ctx, `INSERT INTO `+reports+`(project_id, fetched_at, error, data) VALUES (?, ?, '', ?)
  ON CONFLICT(project_id) DO UPDATE SET fetched_at=excluded.fetched_at, error='', data=excluded.data`, projectID, at, data); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO search_snapshots(project_id, day, fetched_at, data) VALUES (?, ?, ?, ?)
+	if _, err = tx.ExecContext(ctx, `INSERT INTO `+snapshots+`(project_id, day, fetched_at, data) VALUES (?, ?, ?, ?)
  ON CONFLICT(project_id, day) DO UPDATE SET fetched_at=excluded.fetched_at, data=excluded.data`, projectID, at[:10], at, data); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE recommendation_actions SET checked_at=?, result='No longer detected' WHERE project_id=?`, at, projectID); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE recommendation_actions SET checked_at=?, result='No longer detected' WHERE project_id=?`+ofEngine(engine), at, projectID); err != nil {
 		return err
 	}
 	for _, rec := range insight.Analyze(report) {
@@ -114,7 +148,17 @@ type SearchSnapshot struct {
 }
 
 func (s *Store) SearchHistory(ctx context.Context, projectID int64) ([]SearchSnapshot, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT day, fetched_at, data FROM search_snapshots WHERE project_id=? ORDER BY day DESC`, projectID)
+	return s.searchHistory(ctx, "", projectID)
+}
+
+// BingHistory is SearchHistory for Bing Webmaster Tools data.
+func (s *Store) BingHistory(ctx context.Context, projectID int64) ([]SearchSnapshot, error) {
+	return s.searchHistory(ctx, "bing", projectID)
+}
+
+func (s *Store) searchHistory(ctx context.Context, engine string, projectID int64) ([]SearchSnapshot, error) {
+	_, snapshots := searchTables(engine)
+	rows, err := s.db.QueryContext(ctx, `SELECT day, fetched_at, data FROM `+snapshots+` WHERE project_id=? ORDER BY day DESC`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +205,12 @@ func (s *Store) SetRecommendationAction(ctx context.Context, projectID int64, ke
 	if status != "done" && status != "dismissed" {
 		return errors.New("unknown recommendation status")
 	}
-	saved, err := s.SearchReport(ctx, projectID)
+	engine := ""
+	if strings.HasPrefix(key, "bing:") {
+		engine = "bing"
+	}
+	reports, _ := searchTables(engine)
+	saved, err := s.savedReport(ctx, reports, projectID)
 	if err != nil {
 		return err
 	}

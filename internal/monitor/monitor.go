@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/sonic0002/eavesong/internal/ai"
+	"github.com/sonic0002/eavesong/internal/bing"
 	"github.com/sonic0002/eavesong/internal/ga"
 	"github.com/sonic0002/eavesong/internal/gsc"
 	"github.com/sonic0002/eavesong/internal/notify"
@@ -37,6 +38,7 @@ type Monitor struct {
 	cfg     sync.RWMutex // guards Sources, Drafter and search, which settings can replace
 
 	search    []*gsc.Client
+	bing      []*bing.Client
 	analytics []*ga.Client
 
 	lastRun map[string]time.Time // project and source -> last fetch, for paced sources
@@ -115,6 +117,76 @@ func (m *Monitor) ConfigureSearch(clients []*gsc.Client) {
 	m.cfg.Lock()
 	defer m.cfg.Unlock()
 	m.search = clients
+}
+
+// ConfigureBing swaps in the Bing Webmaster Tools clients after accounts change.
+func (m *Monitor) ConfigureBing(clients []*bing.Client) {
+	m.cfg.Lock()
+	defer m.cfg.Unlock()
+	m.bing = clients
+}
+
+// HasBing reports whether any Bing Webmaster Tools key is connected.
+func (m *Monitor) HasBing() bool {
+	m.cfg.RLock()
+	defer m.cfg.RUnlock()
+	return len(m.bing) > 0
+}
+
+// RefreshBing fetches a project's Bing Webmaster Tools data now and saves it.
+// It returns the site used, or an error saying what to fix.
+func (m *Monitor) RefreshBing(ctx context.Context, p store.Project) (string, error) {
+	m.cfg.RLock()
+	clients := m.bing
+	m.cfg.RUnlock()
+	if len(clients) == 0 {
+		return "", errors.New("connect a Bing Webmaster Tools key in Settings first")
+	}
+	var lastErr error
+	for _, c := range clients {
+		sites, err := c.Sites(ctx)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		site := bing.SiteFor(sites, p.Domains)
+		if site == "" {
+			continue
+		}
+		report, err := c.Fetch(ctx, site)
+		if err != nil {
+			lastErr = err
+			break
+		}
+		data, _ := json.Marshal(report)
+		return site, m.Store.SaveBingReport(ctx, p.ID, string(data), "")
+	}
+	if lastErr == nil {
+		d := strings.Join(p.Domains, ", ")
+		lastErr = fmt.Errorf("none of the connected Bing keys can read a site for %s\n"+
+			"Open **Bing Webmaster Tools** with the Microsoft account that made the key\n"+
+			"Add **%s** and verify it, or import it from Google Search Console\n"+
+			"Come back to this tab. Eavesong tries again when you open it", d, d)
+	}
+	if err := m.Store.SaveBingReport(ctx, p.ID, "", lastErr.Error()); err != nil {
+		return "", err
+	}
+	return "", lastErr
+}
+
+// RefreshBingInBackground starts fetching a project's Bing data unless a
+// fetch for it is already running. It reports whether a fetch is running.
+func (m *Monitor) RefreshBingInBackground(p store.Project) bool {
+	if !m.HasBing() {
+		return false
+	}
+	return m.inBackground("bing", p, m.RefreshBing)
+}
+
+// BingFetching reports whether a project's Bing data is being fetched.
+func (m *Monitor) BingFetching(projectID int64) bool {
+	_, ok := m.fetching.Load(fetchKey("bing", projectID))
+	return ok
 }
 
 // ConfigureAnalytics swaps in the Google Analytics clients after accounts change.
@@ -293,6 +365,27 @@ func (m *Monitor) analyticsDue(ctx context.Context, projects []store.Project) {
 			m.Log.Warn("analytics", "project", p.Name, "err", err)
 		} else {
 			m.Log.Info("analytics", "project", p.Name, "property", property)
+		}
+	}
+}
+
+// bingDue refreshes Bing data at most every 20 hours; Bing updates it daily.
+func (m *Monitor) bingDue(ctx context.Context, projects []store.Project) {
+	if !m.HasBing() {
+		return
+	}
+	for _, p := range projects {
+		if len(p.Domains) == 0 {
+			continue
+		}
+		last, err := m.Store.BingReport(ctx, p.ID)
+		if err != nil || time.Since(last.FetchedAt) < 20*time.Hour {
+			continue
+		}
+		if site, err := m.RefreshBing(ctx, p); err != nil {
+			m.Log.Warn("bing", "project", p.Name, "err", err)
+		} else {
+			m.Log.Info("bing", "project", p.Name, "site", site)
 		}
 	}
 }
@@ -510,6 +603,7 @@ func (m *Monitor) CheckAll(ctx context.Context) {
 	}
 	m.draftPending(ctx, projects)
 	m.searchDue(ctx, projects)
+	m.bingDue(ctx, projects)
 	m.analyticsDue(ctx, projects)
 	if m.Notifier != nil {
 		if err := m.Notifier.Run(ctx); err != nil {

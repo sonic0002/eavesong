@@ -1,39 +1,47 @@
 {{template "top" .}}
 {{template "phead" .}}
+{{if and .HasGoogle .HasBing}}<nav class="range" aria-label="Search engine"><a href="/p/{{.Project.ID}}/search?engine=google"{{if not .Engine}} aria-current="page"{{end}}>Google</a><a href="/p/{{.Project.ID}}/search?engine=bing"{{if .Engine}} aria-current="page"{{end}}>Bing</a></nav>{{end}}
 
-{{if .Refreshed}}<p class="flash flash-ok" role="status">Search data refreshed from Google.</p>{{end}}
+{{if .Refreshed}}<p class="flash flash-ok" role="status">Search data refreshed from {{.EngineName}}.</p>{{end}}
 {{if .HasReport}}{{with .RefreshError}}<div class="flash flash-err" role="alert">{{failure .}}</div>{{end}}{{end}}
-{{if .Fetching}}<p class="flash" role="status" data-fetch-status="/p/{{.Project.ID}}/search/status">Getting the latest numbers from Google. This page updates by itself in a few seconds.</p>{{end}}
+{{if .Fetching}}<p class="flash" role="status" data-fetch-status="/p/{{.Project.ID}}/search/status{{.EngineQuery}}">Getting the latest numbers from {{.EngineName}}. This page updates by itself in a few seconds.</p>{{end}}
 
 {{if not .Connected}}
 <div class="empty">
+{{if .Engine}}
+  <p><strong>Bing Webmaster Tools is not connected.</strong></p>
+  <p>Connect an API key in <a href="/settings?open=bing#accounts-bing">Settings</a> to see which Bing searches bring people to {{.Project.Name}}.</p>
+{{else}}
   <p><strong>Search Console is not connected.</strong></p>
-  <p>Connect a read-only service-account key in <a href="/settings?open=searchconsole#accounts-searchconsole">Settings</a> to see which Google searches bring people to {{.Project.Name}}.</p>
+  <p>Connect a read-only service-account key in <a href="/settings?open=searchconsole#accounts-searchconsole">Settings</a> to see which Google searches bring people to {{.Project.Name}}.{{if not .HasBing}} For Bing, connect a <a href="/settings?open=bing#accounts-bing">Bing Webmaster Tools</a> key.{{end}}</p>
+{{end}}
 </div>
 {{else if not .HasReport}}
 <div class="empty">
   <p><strong>No search data yet.</strong></p>
   {{with or .RefreshError .Saved.Error}}<div class="fail-box" role="alert"><p class="fail-label">The last attempt failed.</p>{{failure .}}</div>{{else}}<p>Eavesong fetches it once a day. Get it now:</p>{{end}}
-  <form method="post" action="/p/{{.Project.ID}}/search/refresh"><button class="btn btn-primary" type="submit" data-busy="Fetching from Google…">Fetch search data</button></form>
+  <form method="post" action="/p/{{.Project.ID}}/search/refresh">{{if .Engine}}<input type="hidden" name="engine" value="bing">{{end}}<button class="btn btn-primary" type="submit" data-busy="Fetching from {{.EngineName}}…">Fetch search data</button></form>
 </div>
 {{else}}
 <div class="search-head">
-  <p class="hint">Google Search Console, {{.Report.Property}}, {{.Report.Start}} to {{.Report.End}}. Google reports two to three days late. Fetched {{ago .Saved.FetchedAt}}.</p>
-  <form method="post" action="/p/{{.Project.ID}}/search/refresh"><button class="btn btn-small" type="submit" data-busy="Fetching from Google…">Refresh</button></form>
+  <p class="hint">{{if .Engine}}Bing Webmaster Tools, {{.Report.Property}}, {{.Report.Start}} to {{.Report.End}}. Bing reports a few days late and groups searches and pages by week.{{else}}Google Search Console, {{.Report.Property}}, {{.Report.Start}} to {{.Report.End}}. Google reports two to three days late.{{end}} Fetched {{ago .Saved.FetchedAt}}.</p>
+  <form method="post" action="/p/{{.Project.ID}}/search/refresh">{{if .Engine}}<input type="hidden" name="engine" value="bing">{{end}}<button class="btn btn-small" type="submit" data-busy="Fetching from {{.EngineName}}…">Refresh</button></form>
 </div>
 {{if not .RefreshError}}{{with .Saved.Error}}<div class="flash flash-err" role="alert"><p class="fail-label">The last refresh failed, so these numbers are older.</p>{{failure .}}</div>{{end}}{{end}}
 
 <section class="figures" aria-label="Search summary">
-  <div><p>Clicks from Google</p><strong>{{.Report.Clicks}}</strong></div>
+  <div><p>Clicks from {{.EngineName}}</p><strong>{{.Report.Clicks}}</strong></div>
   <div><p>Times shown in results</p><strong>{{.Report.Impressions}}</strong></div>
   <div><p>Click-through rate</p><strong>{{printf "%.1f" .CTR}}%</strong></div>
   <div><p>Average position</p><strong>{{printf "%.1f" .Position}}</strong></div>
 </section>
+{{if .Engine}}<p class="hint">Bing shows how often Copilot cites the site only in Bing Webmaster Tools, not to apps: <a href="https://www.bing.com/webmasters?siteUrl={{.Report.Property}}" target="_blank" rel="noopener noreferrer">open Bing Webmaster Tools</a> and choose AI Performance.</p>
+{{else}}<p class="hint">Clicks from AI Overviews and AI Mode are counted in these numbers. Google shows how often the site appears in AI answers only in Search Console, not to apps: <a href="https://search.google.com/search-console/performance/search-analytics/ai?resource_id={{.Report.Property}}" target="_blank" rel="noopener noreferrer">open the Generative AI report</a>.</p>{{end}}
 
 <section class="todo" aria-labelledby="todo-heading">
   <div class="todo-head">
     <h2 id="todo-heading">What to do next</h2>
-    {{if .HasWriter}}<form method="post" action="/p/{{.Project.ID}}/search/plan"><button class="btn btn-small" type="submit" data-busy="Writing the plan…">{{if .Plan}}Ask AI for a new plan{{else}}Ask AI for a plan{{end}}</button></form>{{end}}
+    {{if .HasWriter}}<form method="post" action="/p/{{.Project.ID}}/search/plan">{{if .Engine}}<input type="hidden" name="engine" value="bing">{{end}}<button class="btn btn-small" type="submit" data-busy="Writing the plan…">{{if .Plan}}Ask AI for a new plan{{else}}Ask AI for a plan{{end}}</button></form>{{end}}
   </div>
   <p class="hint">Worked out from the numbers below, most valuable first. Each one names the search and the page to work on.{{if not .HasWriter}} With an AI provider set in <a href="/settings">Settings</a>, Eavesong can also turn these into a written plan.{{end}}</p>
   {{with .PlanError}}<p class="flash flash-err" role="alert">No plan: {{.}}.</p>{{end}}
@@ -53,7 +61,7 @@
 {{end}}    </ol>
   </details>{{end}}
 {{else}}
-  <p class="hint">Nothing stands out yet. Recommendations appear as Google shows the site for more searches.</p>
+  <p class="hint">Nothing stands out yet. Recommendations appear as {{.EngineName}} shows the site for more searches.</p>
 {{end}}
 {{if .RecActions}}
 <details><summary>Recommendation follow-through ({{len .RecActions}})</summary>
@@ -94,7 +102,7 @@
 {{if .Report.Sitemaps}}
     <h2>Sitemaps</h2>
     <ul class="followups">
-{{range .Report.Sitemaps}}      <li class="{{if .Errors}}is-attention{{else}}is-suggest{{end}}"><span class="path">{{.Path}}</span> <span>{{if .Errors}}{{.Errors}} errors{{else}}no errors{{end}}{{if .Warnings}}, {{.Warnings}} warnings{{end}}</span></li>
+{{range .Report.Sitemaps}}      <li class="{{if .Errors}}is-attention{{else}}is-suggest{{end}}"><span class="path">{{.Path}}</span> <span>{{if .Status}}{{.Status}}{{else}}{{if .Errors}}{{.Errors}} errors{{else}}no errors{{end}}{{if .Warnings}}, {{.Warnings}} warnings{{end}}{{end}}</span></li>
 {{end}}    </ul>
 {{end}}
   </section>
@@ -114,7 +122,7 @@
 <section class="more">
 <h2>Search history</h2>
 <p class="hint">One snapshot per UTC fetch day, keeping the latest successful refresh that day. Each snapshot covers its own 28-day report period; overlapping periods are not added together. History starts with the saved report available at upgrade.</p>
-<form method="get"><label for="compare">Compare current report with</label> <select id="compare" name="compare">{{range .History}}<option value="{{.Day}}"{{if eq $.CompareDay .Day}} selected{{end}}>{{.Day}} ({{.Report.Start}} to {{.Report.End}})</option>{{end}}</select> <button class="btn btn-small">Compare</button></form>
+<form method="get">{{if .Engine}}<input type="hidden" name="engine" value="bing">{{end}}<label for="compare">Compare current report with</label> <select id="compare" name="compare">{{range .History}}<option value="{{.Day}}"{{if eq $.CompareDay .Day}} selected{{end}}>{{.Day}} ({{.Report.Start}} to {{.Report.End}})</option>{{end}}</select> <button class="btn btn-small">Compare</button></form>
 {{with .Comparison}}<p>Compared with the snapshot from {{.Day}} ({{.Report.Start}} to {{.Report.End}}): clicks changed by {{$.ClickChange}}, impressions by {{$.ImpressionChange}}.</p>{{end}}
 <details><summary>All daily snapshots</summary><table><thead><tr><th>Saved</th><th>Period</th><th>Clicks</th><th>Impressions</th></tr></thead><tbody>{{range .History}}<tr><td>{{.Day}}</td><td>{{.Report.Start}} – {{.Report.End}}</td><td>{{.Report.Clicks}}</td><td>{{.Report.Impressions}}</td></tr>{{end}}</tbody></table></details>
 </section>{{end}}

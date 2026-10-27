@@ -102,7 +102,18 @@ func TestWeeklyDigestCombinesMentionsAndSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"2 mentions", "reddit: 1", "hackernews: 1", "Acme: 1", "Rival: 1", "42 clicks", "600 impressions"} {
+	if strings.Contains(event.Text, "Bing") {
+		t.Errorf("without Bing data the digest has no Bing line: %s", event.Text)
+	}
+	bingReport, _ := json.Marshal(gsc.Report{Engine: "bing", Start: "2026-10-19", End: "2026-10-25", Clicks: 9, Impressions: 120})
+	if err := db.SaveBingReport(ctx, p.ID, string(bingReport), ""); err != nil {
+		t.Fatal(err)
+	}
+	event, err = (&Service{Store: db}).digest(ctx, p, 7, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"2 mentions", "reddit: 1", "hackernews: 1", "Acme: 1", "Rival: 1", "42 clicks", "600 impressions", "Bing Webmaster Tools (2026-10-19 to 2026-10-25): 9 clicks, 120 impressions"} {
 		if !strings.Contains(event.Text, want) {
 			t.Errorf("weekly digest missing %q: %s", want, event.Text)
 		}

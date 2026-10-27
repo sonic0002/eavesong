@@ -648,6 +648,7 @@ func (s *Server) Reconfigure(ctx context.Context) error {
 	drafter, _ := cfg.Drafter()
 	s.Monitor.Configure(config.Sources(accounts, config.XBudget{Store: s.Store, Cap: cfg.XCap()}), drafter)
 	s.Monitor.ConfigureSearch(config.SearchClients(accounts))
+	s.Monitor.ConfigureBing(config.BingClients(accounts))
 	s.Monitor.ConfigureAnalytics(config.AnalyticsClients(accounts))
 	s.Monitor.ConfigureScopes(config.Scopes(accounts))
 	s.Monitor.ConfigureOwn(config.OwnNames(accounts))
@@ -694,7 +695,8 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	saved, err := s.Store.SearchReport(ctx, p.ID)
+	engine := s.searchEngine(r)
+	saved, err := s.savedSearch(ctx, engine, p.ID)
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -706,10 +708,21 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	// Opening the tab fetches fresh numbers, unless they are only minutes old
 	// or this page is the result of a refresh.
 	q := r.URL.Query()
-	if time.Since(saved.FetchedAt) > freshFor(saved) && !q.Has("refreshed") && !q.Has("error") {
-		s.Monitor.RefreshSearchInBackground(p)
+	connected := s.Monitor.HasSearch()
+	if engine == "bing" {
+		connected = s.Monitor.HasBing()
+		if time.Since(saved.FetchedAt) > freshFor(saved) && !q.Has("refreshed") && !q.Has("error") {
+			s.Monitor.RefreshBingInBackground(p)
+		}
+		data["Fetching"] = s.Monitor.BingFetching(p.ID)
+	} else {
+		if time.Since(saved.FetchedAt) > freshFor(saved) && !q.Has("refreshed") && !q.Has("error") {
+			s.Monitor.RefreshSearchInBackground(p)
+		}
+		data["Fetching"] = s.Monitor.SearchFetching(p.ID)
 	}
-	data["Fetching"] = s.Monitor.SearchFetching(p.ID)
+	data["Engine"], data["EngineName"], data["EngineQuery"] = engine, engineName(engine), engineQuery(engine)
+	data["HasGoogle"], data["HasBing"] = s.Monitor.HasSearch(), s.Monitor.HasBing()
 	if err := s.addPulse(ctx, p.ID, data); err != nil {
 		s.fail(w, err)
 		return
@@ -726,17 +739,17 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 		pos /= float64(weight)
 	}
 	data["Title"], data["Tab"], data["Project"] = p.Name+" search", "search", p
-	data["Report"], data["HasReport"], data["Saved"], data["Connected"] = report, saved.Data != "", saved, s.Monitor.HasSearch()
+	data["Report"], data["HasReport"], data["Saved"], data["Connected"] = report, saved.Data != "", saved, connected
 	data["CTR"], data["Position"], data["Refreshed"], data["RefreshError"] = ctr, pos, r.URL.Query().Has("refreshed"), r.URL.Query().Get("error")
 	recs := insight.Analyze(report)
 	data["CompareDay"] = r.URL.Query().Get("compare")
-	if err := s.searchProgress(ctx, p.ID, report, data); err != nil {
+	if err := s.searchProgress(ctx, engine, p.ID, report, data); err != nil {
 		s.fail(w, err)
 		return
 	}
 	data["Recs"], data["MoreRecs"] = recs[:min(len(recs), 8)], recs[min(len(recs), 8):]
 	data["HasWriter"] = s.Monitor.Writer() != nil
-	data["Plan"], _ = s.savedPlan(ctx, p.ID)
+	data["Plan"], _ = s.savedPlan(ctx, engine, p.ID)
 	data["PlanError"] = r.URL.Query().Get("plan_error")
 	s.render(w, "search.html", data)
 }
@@ -749,12 +762,63 @@ func (s *Server) refreshSearch(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	target := "/p/" + strconv.FormatInt(p.ID, 10) + "/search"
-	if _, err := s.Monitor.RefreshSearch(ctx, p); err != nil {
-		http.Redirect(w, r, target+"?error="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+	engine := s.searchEngine(r)
+	target := "/p/" + strconv.FormatInt(p.ID, 10) + "/search?" + engineParam(engine)
+	refresh := s.Monitor.RefreshSearch
+	if engine == "bing" {
+		refresh = s.Monitor.RefreshBing
+	}
+	if _, err := refresh(ctx, p); err != nil {
+		http.Redirect(w, r, target+"error="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, target+"?refreshed=1", http.StatusSeeOther)
+	http.Redirect(w, r, target+"refreshed=1", http.StatusSeeOther)
+}
+
+// searchEngine is the engine a Search tab request is about: "" for Google,
+// "bing" for Bing. Without a choice it is Google, unless only Bing is connected.
+func (s *Server) searchEngine(r *http.Request) string {
+	switch r.FormValue("engine") {
+	case "bing":
+		return "bing"
+	case "google":
+		return ""
+	}
+	if !s.Monitor.HasSearch() && s.Monitor.HasBing() {
+		return "bing"
+	}
+	return ""
+}
+
+func (s *Server) savedSearch(ctx context.Context, engine string, projectID int64) (store.SearchReport, error) {
+	if engine == "bing" {
+		return s.Store.BingReport(ctx, projectID)
+	}
+	return s.Store.SearchReport(ctx, projectID)
+}
+
+func engineName(engine string) string {
+	if engine == "bing" {
+		return "Bing"
+	}
+	return "Google"
+}
+
+// engineParam is the start of a Search tab query string that keeps the engine:
+// "engine=bing&" for Bing, and nothing for Google, so Google's links stay as they were.
+func engineParam(engine string) string {
+	if engine == "bing" {
+		return "engine=bing&"
+	}
+	return ""
+}
+
+// engineQuery is "?engine=bing" for links to Bing's Search tab, "" for Google's.
+func engineQuery(engine string) string {
+	if engine == "bing" {
+		return "?engine=bing"
+	}
+	return ""
 }
 
 // shownAccount is a connected account as the settings pages show it.
@@ -892,15 +956,21 @@ type searchPlanStored struct {
 	Period   string    `json:"period"`
 }
 
-func planKey(projectID int64) string { return "search_plan_" + strconv.FormatInt(projectID, 10) }
+// planKey names the setting that holds a project's plan; Google's is unchanged from 0.3.
+func planKey(engine string, projectID int64) string {
+	if engine == "bing" {
+		return "search_plan_bing_" + strconv.FormatInt(projectID, 10)
+	}
+	return "search_plan_" + strconv.FormatInt(projectID, 10)
+}
 
-func (s *Server) savedPlan(ctx context.Context, projectID int64) (*searchPlanStored, error) {
+func (s *Server) savedPlan(ctx context.Context, engine string, projectID int64) (*searchPlanStored, error) {
 	saved, err := s.Store.Settings(ctx)
-	if err != nil || saved[planKey(projectID)] == "" {
+	if err != nil || saved[planKey(engine, projectID)] == "" {
 		return nil, err
 	}
 	var plan searchPlanStored
-	if err := json.Unmarshal([]byte(saved[planKey(projectID)]), &plan); err != nil {
+	if err := json.Unmarshal([]byte(saved[planKey(engine, projectID)]), &plan); err != nil {
 		return nil, err
 	}
 	return &plan, nil
@@ -918,15 +988,16 @@ func (s *Server) searchPlan(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	target := "/p/" + strconv.FormatInt(p.ID, 10) + "/search"
+	engine := s.searchEngine(r)
+	target := "/p/" + strconv.FormatInt(p.ID, 10) + "/search?" + engineParam(engine)
 	writer := s.Monitor.Writer()
 	if writer == nil {
-		http.Redirect(w, r, target+"?plan_error="+url.QueryEscape("choose an AI provider in Settings first"), http.StatusSeeOther)
+		http.Redirect(w, r, target+"plan_error="+url.QueryEscape("choose an AI provider in Settings first"), http.StatusSeeOther)
 		return
 	}
-	saved, err := s.Store.SearchReport(ctx, p.ID)
+	saved, err := s.savedSearch(ctx, engine, p.ID)
 	if err != nil || saved.Data == "" {
-		http.Redirect(w, r, target+"?plan_error="+url.QueryEscape("fetch search data first"), http.StatusSeeOther)
+		http.Redirect(w, r, target+"plan_error="+url.QueryEscape("fetch search data first"), http.StatusSeeOther)
 		return
 	}
 	var report gsc.Report
@@ -952,20 +1023,24 @@ func (s *Server) searchPlan(w http.ResponseWriter, r *http.Request) {
 	for _, rec := range insight.Analyze(report) {
 		fmt.Fprintf(&b, "- %s: %s. %s\n", rec.Label, rec.Title, rec.Detail)
 	}
-	text, err := writer.Write(ctx, planInstructions, b.String())
+	instructions := planInstructions
+	if engine == "bing" {
+		instructions = strings.NewReplacer("Google Search Console", "Bing Webmaster Tools", "Google", "Bing").Replace(planInstructions)
+	}
+	text, err := writer.Write(ctx, instructions, b.String())
 	if err != nil {
 		cfg, _ := s.Config.Load(ctx)
-		http.Redirect(w, r, target+"?plan_error="+url.QueryEscape(explain(err, cfg)), http.StatusSeeOther)
+		http.Redirect(w, r, target+"plan_error="+url.QueryEscape(explain(err, cfg)), http.StatusSeeOther)
 		return
 	}
 	cfg, _ := s.Config.Load(ctx)
 	_, provider := cfg.Drafter()
 	stored, _ := json.Marshal(searchPlanStored{At: time.Now().UTC(), Text: text, Provider: provider, Period: report.Start + " to " + report.End})
-	if err := s.Store.SaveSettings(ctx, map[string]string{planKey(p.ID): string(stored)}); err != nil {
+	if err := s.Store.SaveSettings(ctx, map[string]string{planKey(engine, p.ID): string(stored)}); err != nil {
 		s.fail(w, err)
 		return
 	}
-	http.Redirect(w, r, target+"#plan", http.StatusSeeOther)
+	http.Redirect(w, r, "/p/"+strconv.FormatInt(p.ID, 10)+"/search"+engineQuery(engine)+"#plan", http.StatusSeeOther)
 }
 
 // activity tells an open inbox whether new mentions arrived or a check
@@ -1000,5 +1075,9 @@ func freshFor(saved store.SearchReport) time.Duration {
 func (s *Server) searchStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(map[string]bool{"fetching": s.Monitor.SearchFetching(id(r))})
+	fetching := s.Monitor.SearchFetching(id(r))
+	if s.searchEngine(r) == "bing" {
+		fetching = s.Monitor.BingFetching(id(r))
+	}
+	json.NewEncoder(w).Encode(map[string]bool{"fetching": fetching})
 }

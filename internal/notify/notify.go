@@ -166,6 +166,16 @@ func (s *Service) digest(ctx context.Context, p store.Project, days int, now tim
 				fmt.Fprintf(&b, "Search Console (%s to %s): %d clicks, %d impressions.\n", report.Start, report.End, report.Clicks, report.Impressions)
 			}
 		}
+		saved, err = s.Store.BingReport(ctx, p.ID)
+		if err != nil {
+			return Event{}, err
+		}
+		if saved.Data != "" {
+			var report gsc.Report
+			if json.Unmarshal([]byte(saved.Data), &report) == nil {
+				fmt.Fprintf(&b, "Bing Webmaster Tools (%s to %s): %d clicks, %d impressions.\n", report.Start, report.End, report.Clicks, report.Impressions)
+			}
+		}
 	}
 	kind := "Daily digest"
 	if days == 7 {

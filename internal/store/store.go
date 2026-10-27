@@ -168,6 +168,10 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := migrateBing(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Store{db: db}, nil
 }
 
@@ -693,7 +697,17 @@ func (s *Store) savedReport(ctx context.Context, table string, projectID int64) 
 // SaveSearchReport stores fresh data, or only the error when data is empty so
 // the last good report stays visible.
 func (s *Store) SaveSearchReport(ctx context.Context, projectID int64, data, problem string) error {
-	return s.saveSearchHistory(ctx, projectID, data, problem)
+	return s.saveSearchHistory(ctx, "", projectID, data, problem)
+}
+
+// BingReport is the latest Bing Webmaster Tools data saved for a project.
+func (s *Store) BingReport(ctx context.Context, projectID int64) (SearchReport, error) {
+	return s.savedReport(ctx, "bing_reports", projectID)
+}
+
+// SaveBingReport stores fresh Bing data, or only the error.
+func (s *Store) SaveBingReport(ctx context.Context, projectID int64, data, problem string) error {
+	return s.saveSearchHistory(ctx, "bing", projectID, data, problem)
 }
 
 // saveReport writes one of the report tables, whose names are constants.

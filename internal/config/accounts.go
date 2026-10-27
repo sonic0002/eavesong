@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sonic0002/eavesong/internal/bing"
 	"github.com/sonic0002/eavesong/internal/ga"
 	"github.com/sonic0002/eavesong/internal/gsc"
 	"github.com/sonic0002/eavesong/internal/source"
@@ -106,10 +107,14 @@ var AccountPlatforms = []Platform{
 		Help:   "GitHub is searched without a token. Tokens raise the limit; with several, the next is used when one hits its limit.",
 		Steps:  []string{"Create a fine-grained token at github.com/settings/tokens with no extra permissions."},
 		Fields: []Field{{"secret", "Token", "", "password", false}, {"name", "Label", "optional", "text", true}}, Button: "Save token"},
-	{Key: "searchconsole", Kind: KindKey, Name: "Search Console",
+	{Key: "searchconsole", Kind: KindKey, Name: "Google Search Console",
 		Help:   "Shows the Google searches each project appears for, in the project's Search tab.",
 		Steps:  []string{"In Google Cloud, enable the Search Console API, create a service account and download a JSON key.", "In Search Console, open Settings, Users and permissions, and add the service account's email as a Restricted user.", "Paste the whole key file. Eavesong lists the properties it can read."},
 		Fields: []Field{{"secret", "Service account key (JSON)", `{"type": "service_account", ...}`, "textarea", false}}, Button: "Connect"},
+	{Key: "bing", Kind: KindKey, Name: "Bing Webmaster Tools",
+		Help:   "Shows the Bing searches each project appears for, in the project's Search tab next to Google's.",
+		Steps:  []string{"Sign in at bing.com/webmasters and add and verify your site (you can import it from Search Console).", "Open Settings, API access, accept the terms and click Generate API Key.", "Paste the key. Eavesong lists the sites it can read."},
+		Fields: []Field{{"secret", "API key", "", "password", false}}, Button: "Connect"},
 	{Key: "googleanalytics", Kind: KindKey, Name: "Google Analytics",
 		Help:   "Shows visitors, where they came from and which pages they read, in the project's Traffic tab, next to the mentions from each place. Google Analytics 4 only.",
 		Steps:  []string{"In Google Cloud, enable the Google Analytics Admin API and the Google Analytics Data API. You can reuse the Search Console service account, or create one and download a JSON key.", "In Google Analytics, open Admin, Property access management, and add the service account's email as a Viewer.", "Paste the whole key file. Eavesong matches each project to the property that measures its domain."},
@@ -178,6 +183,7 @@ func (m Manager) Accounts(ctx context.Context) ([]Account, error) {
 		out = append(out, Account{Platform: "xaccount", Name: store.CleanHandle(u), FromEnv: true})
 	}
 	env("youtube", "from YOUTUBE_API_KEY", os.Getenv("YOUTUBE_API_KEY"))
+	env("bing", "from BING_WEBMASTER_API_KEY", os.Getenv("BING_WEBMASTER_API_KEY"))
 	env("producthunt", "from PRODUCTHUNT_TOKEN", os.Getenv("PRODUCTHUNT_TOKEN"))
 	env("stackoverflow", "from STACKEXCHANGE_KEY", os.Getenv("STACKEXCHANGE_KEY"))
 	return out, nil
@@ -261,7 +267,7 @@ func normalize(platform, name, secret string) (string, string, error) {
 			return "", "", err
 		}
 		name = key.ClientEmail
-	case "devto", "youtube", "stackoverflow", "github", "googlealerts", "producthunt":
+	case "devto", "youtube", "stackoverflow", "github", "googlealerts", "producthunt", "bing":
 		if err := need(secret, "the key"); err != nil {
 			return "", "", err
 		}
@@ -295,7 +301,7 @@ func (m Manager) AddAccountWithNote(ctx context.Context, platform, name, secret 
 	}
 	switch {
 	case name != "":
-	case platform == "github", platform == "youtube", platform == "stackoverflow":
+	case platform == "github", platform == "youtube", platform == "stackoverflow", platform == "bing":
 		name = "key ending " + secret[max(0, len(secret)-4):]
 	case platform == "x", platform == "producthunt":
 		name = "token ending " + secret[max(0, len(secret)-4):]
@@ -492,6 +498,18 @@ func (LiveVerifier) Check(ctx context.Context, platform, name, secret string) (C
 			names = append(names, n)
 		}
 		return Checked{Name: client.Email(), Note: "It can read " + strings.Join(names, ", ") + "."}, nil
+	case "bing":
+		sites, err := bing.Verify(ctx, "", secret)
+		if err != nil {
+			return Checked{}, err
+		}
+		if len(sites) == 0 {
+			return Checked{}, errors.New("Bing accepted the key, but its account has no verified sites yet\n" +
+				"Open **Bing Webmaster Tools** with the same Microsoft account that made the key\n" +
+				"Add your site and verify it, or import it from Google Search Console\n" +
+				"Come back here and connect the key again")
+		}
+		return Checked{Note: "It can read " + strings.Join(sites, ", ") + "."}, nil
 	case "mastodon":
 		acct, err := source.VerifyMastodon(ctx, name, secret)
 		return Checked{Name: acct}, err
@@ -524,6 +542,17 @@ func SearchClients(accounts []Account) []*gsc.Client {
 		}
 		if c, err := gsc.New(a.Secret); err == nil {
 			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// BingClients builds a Bing Webmaster Tools client for every connected key.
+func BingClients(accounts []Account) []*bing.Client {
+	var out []*bing.Client
+	for _, a := range accounts {
+		if a.Platform == "bing" {
+			out = append(out, bing.New(a.Secret))
 		}
 	}
 	return out

@@ -88,6 +88,7 @@ func run(log *slog.Logger) error {
 	m := &monitor.Monitor{Store: db, Sources: config.Sources(accounts, config.XBudget{Store: db, Cap: cfg.XCap()}), Drafter: draft, Interval: interval, Log: log}
 	m.Notifier = &notify.Service{Store: db, Config: settings}
 	m.ConfigureSearch(config.SearchClients(accounts))
+	m.ConfigureBing(config.BingClients(accounts))
 	m.ConfigureAnalytics(config.AnalyticsClients(accounts))
 	m.ConfigureScopes(config.Scopes(accounts))
 	m.ConfigureOwn(config.OwnNames(accounts))
