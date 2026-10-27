@@ -85,6 +85,12 @@ These strings are stored, so changing them duplicates or orphans data:
    Analytics referrer list in `internal/ga`, `.env.example` if it reads an
    environment variable, and the README's Sources table.
 5. `docs/roadmap.md` is updated (it is kept out of Git).
+6. `git status` shows only files meant for the repository. Anything else
+   (databases, `.env`, keys, built binaries, editor and OS files such as
+   `.DS_Store`, local notes, scratch output) is added to `.gitignore`, and a
+   file that is already tracked by mistake is removed with `git rm --cached`.
+   Never commit a secret; if one was committed, say so rather than only
+   deleting it.
 
 ## Style
 
