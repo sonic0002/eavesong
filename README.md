@@ -82,6 +82,7 @@ Environment variables (see `.env.example`) set the server itself, and give defau
 | Facebook Pages | Comments on recent posts of Pages you manage (Meta does not allow searching public posts) | a Page access token and the Page ID |
 | Google Alerts | Blogs, news and forums, through alerts delivered as RSS | the alert's RSS link from google.com/alerts |
 | Google Search Console | Search data for the property matching each project's websites (Search tab) | a service-account JSON key, added to the property as a Restricted user |
+| Product Hunt | Launches whose name, tagline or description mention your terms, and their comments | a developer token from producthunt.com/v2/oauth/applications; Product Hunt has no search, so it reads every launch of the last two days, at most once an hour |
 | DEV (dev.to) | Comments on the published articles of every connected account (DEV has no public search) | an API key from dev.to/settings/extensions |
 
 Reddit no longer approves new API apps for this kind of use, so Eavesong uses Reddit's public feeds at a modest rate and does not scrape. Posts by bots such as `dependabot[bot]` and `renovate[bot]` are ignored.

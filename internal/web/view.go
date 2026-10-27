@@ -14,12 +14,14 @@ import (
 var sourceNames = map[string]string{
 	"hackernews": "Hacker News", "reddit": "Reddit", "x": "X", "devto": "DEV", "searchconsole": "Search Console", "googleanalytics": "Google Analytics", "lobsters": "Lobsters",
 	"stackoverflow": "Stack Overflow", "mastodon": "Mastodon", "youtube": "YouTube", "facebook": "Facebook", "googlealerts": "Google Alerts", "github": "GitHub", "bluesky": "Bluesky",
+	"producthunt": "Product Hunt",
 }
 
 // sourceMarks are the short labels on each mention's source badge.
 var sourceMarks = map[string]string{
 	"hackernews": "HN", "reddit": "R", "x": "X", "devto": "DEV", "searchconsole": "G", "googleanalytics": "A", "lobsters": "L",
 	"stackoverflow": "SO", "mastodon": "M", "youtube": "YT", "facebook": "f", "googlealerts": "GA", "github": "GH", "bluesky": "B",
+	"producthunt": "PH",
 }
 
 var bskyProfile = regexp.MustCompile(`^https://bsky\.app/profile/([^/]+)/post/`)

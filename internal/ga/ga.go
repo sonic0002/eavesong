@@ -401,6 +401,7 @@ var watched = []struct{ host, source string }{
 	{"stackoverflow.com", "stackoverflow"},
 	{"youtube.com", "youtube"},
 	{"facebook.com", "facebook"},
+	{"producthunt.com", "producthunt"},
 }
 
 // WatchedSource names the Eavesong source behind an Analytics session

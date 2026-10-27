@@ -19,6 +19,7 @@ var Platforms = []struct{ Key, Name, Placeholder string }{
 	{"hackernews", "Hacker News", "acme"},
 	{"github", "GitHub", "acme-bot, acme"},
 	{"lobsters", "Lobsters", "acme"},
+	{"producthunt", "Product Hunt", "acme"},
 	{"other", "Anywhere", "names used on every platform"},
 }
 

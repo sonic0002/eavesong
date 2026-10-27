@@ -90,6 +90,10 @@ var AccountPlatforms = []Platform{
 		Help:   "Finds new videos about your product. A search uses 100 of the 10,000 free daily quota units, so Eavesong checks every six hours.",
 		Steps:  []string{"In Google Cloud, enable the YouTube Data API v3 and create an API key."},
 		Fields: []Field{{"secret", "API key", "", "password", false}, {"name", "Label", "optional", "text", true}}, Button: "Connect"},
+	{Key: "producthunt", Kind: KindKey, Name: "Product Hunt",
+		Help:   "Finds launches whose name, tagline or description mention your terms, and reads their comments. Product Hunt has no search, so Eavesong reads every launch of the last two days, at most once an hour.",
+		Steps:  []string{"At producthunt.com/v2/oauth/applications, add an application (any redirect URI, such as https://localhost).", "Click \"Create Token\" under Developer Token and copy it."},
+		Fields: []Field{{"secret", "Developer token", "", "password", false}}, Button: "Save token"},
 	{Key: "stackoverflow", Kind: KindKey, Name: "Stack Overflow", Free: true,
 		Help:   "Stack Overflow is searched without any key, every two hours. A free key raises the daily quota so it can be checked every time.",
 		Steps:  []string{"Register an app at stackapps.com/apps/oauth/register and copy its Key (not the secret)."},
@@ -174,6 +178,7 @@ func (m Manager) Accounts(ctx context.Context) ([]Account, error) {
 		out = append(out, Account{Platform: "xaccount", Name: store.CleanHandle(u), FromEnv: true})
 	}
 	env("youtube", "from YOUTUBE_API_KEY", os.Getenv("YOUTUBE_API_KEY"))
+	env("producthunt", "from PRODUCTHUNT_TOKEN", os.Getenv("PRODUCTHUNT_TOKEN"))
 	env("stackoverflow", "from STACKEXCHANGE_KEY", os.Getenv("STACKEXCHANGE_KEY"))
 	return out, nil
 }
@@ -256,7 +261,7 @@ func normalize(platform, name, secret string) (string, string, error) {
 			return "", "", err
 		}
 		name = key.ClientEmail
-	case "devto", "youtube", "stackoverflow", "github", "googlealerts":
+	case "devto", "youtube", "stackoverflow", "github", "googlealerts", "producthunt":
 		if err := need(secret, "the key"); err != nil {
 			return "", "", err
 		}
@@ -292,7 +297,7 @@ func (m Manager) AddAccountWithNote(ctx context.Context, platform, name, secret 
 	case name != "":
 	case platform == "github", platform == "youtube", platform == "stackoverflow":
 		name = "key ending " + secret[max(0, len(secret)-4):]
-	case platform == "x":
+	case platform == "x", platform == "producthunt":
 		name = "token ending " + secret[max(0, len(secret)-4):]
 	}
 	sealed, err := m.Box.Seal(secret)
@@ -355,6 +360,7 @@ func Sources(accounts []Account, xBudget source.Budget) []source.Source {
 		xTokens, xUsers               []string
 		pages                         []source.FacebookPage
 		feeds, tokens, ytKeys, alerts []string
+		phTokens                      []string
 		soKey                         string
 	)
 	for _, a := range accounts {
@@ -389,6 +395,8 @@ func Sources(accounts []Account, xBudget source.Budget) []source.Source {
 			soKey = a.Secret
 		case "googlealerts":
 			alerts = append(alerts, a.Secret)
+		case "producthunt":
+			phTokens = append(phTokens, a.Secret)
 		}
 	}
 	list := []source.Source{
@@ -418,6 +426,9 @@ func Sources(accounts []Account, xBudget source.Budget) []source.Source {
 	}
 	if len(alerts) > 0 {
 		list = append(list, source.GoogleAlerts{Feeds: alerts})
+	}
+	if len(phTokens) > 0 {
+		list = append(list, source.ProductHunt{Tokens: phTokens})
 	}
 	return list
 }
@@ -495,6 +506,8 @@ func (LiveVerifier) Check(ctx context.Context, platform, name, secret string) (C
 		return Checked{}, source.VerifyYouTube(ctx, "", secret)
 	case "stackoverflow":
 		return Checked{}, source.VerifyStackExchange(ctx, "", secret)
+	case "producthunt":
+		return Checked{}, source.VerifyProductHunt(ctx, "", secret)
 	case "googlealerts":
 		alert, err := source.VerifyGoogleAlert(ctx, secret)
 		return Checked{Name: alert}, err
