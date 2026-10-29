@@ -1,4 +1,4 @@
-# Eavesong
+# <img src="internal/web/static/eavesong.svg" alt="" width="32" height="32" align="top"> Eavesong
 
 *Eaves* as in eavesdropping, the talk you overhear: Eavesong listens for what people say about your product.
 
